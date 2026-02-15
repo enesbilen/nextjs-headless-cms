@@ -1,0 +1,16 @@
+model MediaVariant {
+  id          String     @id @default(cuid())
+  mediaId     String
+  type        VariantType
+  storagePath String
+  mimeType    String?
+  width       Int?
+  height      Int?
+  size        Int
+  createdAt   DateTime   @default(now())
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaId, type])
+  @@index([mediaId])
+}

@@ -1,0 +1,23 @@
+model Post {
+  id             String    @id @default(cuid())
+  slug           String    @unique
+  title          String
+  body           String    @db.LongText
+  excerpt        String?   @db.Text
+  status         Status    @default(DRAFT)
+  publishedAt    DateTime?
+  authorId       String?
+  coverImageId   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  author     User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  coverImage Media?  @relation("PostCoverImage", fields: [coverImageId], references: [id], onDelete: SetNull)
+  comments   Comment[]
+
+  @@index([status])
+  @@index([slug])
+  @@index([authorId])
+  @@index([coverImageId])
+}

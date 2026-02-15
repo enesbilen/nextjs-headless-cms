@@ -1,0 +1,23 @@
+model Media {
+  id          String    @id @default(cuid())
+  filename    String
+  mimeType    String?
+  storagePath String
+  width       Int?
+  height      Int?
+  alt         String?   @db.Text
+  checksum    String
+  userId      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  user      User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  variants  MediaVariant[]
+  pages     Page[]          @relation("PageCoverImage")
+  posts     Post[]          @relation("PostCoverImage")
+
+  @@index([userId])
+  @@index([deletedAt])
+  @@index([createdAt])
+}

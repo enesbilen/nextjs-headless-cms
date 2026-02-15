@@ -1,0 +1,17 @@
+model Page {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  body           String   @db.LongText
+  status         Status   @default(DRAFT)
+  coverImageId   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  coverImage Media? @relation("PageCoverImage", fields: [coverImageId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([slug])
+  @@index([coverImageId])
+}

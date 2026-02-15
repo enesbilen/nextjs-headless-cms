@@ -1,0 +1,23 @@
+// Multi-file schema: generator + datasource + global enums only.
+// All models live in prisma/models/*.prisma
+
+datasource db {
+  provider = "mysql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Status {
+  DRAFT
+  PUBLISHED
+}
+
+enum VariantType {
+  THUMBNAIL
+  MEDIUM
+  LARGE
+  WEBP
+  AVIF
+}
