@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useReducer } from "react";
-import { useRouter } from "next/navigation";
 import { useFeedback } from "@/core/ui/FeedbackContext";
 import { uploadMedia, deleteMedia, updateMedia, retryMedia } from "./actions";
 import type { MediaItem, MediaState, MediaAction, ListItem, FailedUpload } from "./media.types";
+import { useScheduledRefresh } from "./useScheduledRefresh";
 
 function mediaReducer(state: MediaState, action: MediaAction): MediaState {
   switch (action.type) {
@@ -89,7 +89,7 @@ export type UseMediaManagerProps = {
 
 export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
   const feedback = useFeedback();
-  const router = useRouter();
+  const { requestRefresh } = useScheduledRefresh();
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [state, dispatch] = useReducer(mediaReducer, {
@@ -146,7 +146,7 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
       if (result.uploaded.length > 0) {
         const deduplicatedCount = result.uploaded.filter((u) => u.deduplicated).length;
         dispatch({ type: "UPLOAD_SUCCESS", payload: { tempIds } });
-        router.refresh();
+        requestRefresh();
         if (deduplicatedCount > 0) {
           feedback.showInfo(
             deduplicatedCount === 1
@@ -171,7 +171,7 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
         feedback.showError(msg);
       }
     },
-    [feedback, resetFileInput, router]
+    [feedback, resetFileInput, requestRefresh]
   );
 
   const isUploading = state.uploads.some(
@@ -217,7 +217,7 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
       if (result.ok) {
         dispatch({ type: "SET_DELETING", payload: null });
         dispatch({ type: "SET_DETAIL", payload: null });
-        router.refresh();
+        requestRefresh();
         feedback.showSuccess("Medya silindi.");
       } else {
         dispatch({ type: "SET_DELETING", payload: null });
@@ -225,7 +225,7 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
         feedback.showError(result.error);
       }
     },
-    [feedback, router]
+    [feedback, requestRefresh]
   );
 
   const handleEditSubmit = useCallback(
@@ -234,14 +234,14 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
       const result = await updateMedia(mediaId, formData);
       if (result.ok) {
         dispatch({ type: "SET_EDITING", payload: null });
-        router.refresh();
+        requestRefresh();
         feedback.showSuccess("Değişiklikler kaydedildi.");
       } else {
         dispatch({ type: "SET_EDIT_ERROR", payload: result.error });
         feedback.showError(result.error);
       }
     },
-    [feedback, router]
+    [feedback, requestRefresh]
   );
 
   const toggleBulkSelect = useCallback((id: string) => {
@@ -267,11 +267,11 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
       if (result.ok) deleted++;
     }
     dispatch({ type: "BULK_DELETE_DONE", payload: undefined });
-    router.refresh();
+    requestRefresh();
     feedback.showSuccess(
       deleted === count ? `${deleted} öğe silindi.` : `${deleted}/${count} öğe silindi.`
     );
-  }, [state.selectedIds, feedback, router]);
+  }, [state.selectedIds, feedback, requestRefresh]);
 
   const startBulkSelect = useCallback(() => {
     dispatch({ type: "BULK_SELECT_MODE", payload: true });
@@ -287,14 +287,14 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
       const result = await retryMedia(mediaId);
       if (result.ok) {
         dispatch({ type: "SET_RETRYING", payload: null });
-        router.refresh();
+        requestRefresh();
         feedback.showSuccess("Yeniden işlendi.");
       } else {
         dispatch({ type: "SET_RETRYING", payload: null });
         feedback.showError(result.error);
       }
     },
-    [feedback, router]
+    [feedback, requestRefresh]
   );
 
   const listItems: ListItem[] = useMemo(
