@@ -1,19 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
-import { uploadMedia } from "./actions";
+import { useMediaManager } from "./useMediaManager";
+import { UploadDropzone } from "./UploadDropzone";
+import { MediaGrid } from "./MediaGrid";
+import type { MediaItem } from "./media.types";
 
-type MediaItem = {
-  id: string;
-  filename: string;
-  mimeType: string | null;
-  width: number | null;
-  height: number | null;
-  createdAt: Date;
-  url: string;
-  thumbnailUrl: string;
-};
+export type { MediaItem };
 
 type Props = {
   initialItems: MediaItem[];
@@ -26,146 +18,158 @@ export function MediaManager({
   initialItems,
   selectMode,
 }: Props) {
-  const router = useRouter();
-  const [items, setItems] = useState(initialItems);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const {
+    state,
+    listItems,
+    inputRef,
+    isUploading,
+    handleFiles,
+    copyUrl,
+    selectItem,
+    handleDelete,
+    handleEditSubmit,
+    startBulkSelect,
+    toggleBulkSelect,
+    handleBulkDelete,
+    cancelBulkSelect,
+    handleRetry,
+    setEditingId,
+  } = useMediaManager({ initialItems, selectMode });
 
-  const handleFiles = useCallback(
-    async (files: FileList | null) => {
-      if (!files?.length) return;
-      setError(null);
-      setUploading(true);
-      for (let i = 0; i < files.length; i++) {
-        const formData = new FormData();
-        formData.set("file", files[i]);
-        const result = await uploadMedia(formData);
-        if (result.ok) {
-          setItems((prev) => [
-            {
-              id: result.media.id,
-              filename: result.media.filename,
-              mimeType: null,
-              width: result.media.width,
-              height: result.media.height,
-              createdAt: new Date(),
-              url: result.media.url,
-              thumbnailUrl: result.media.url + "?variant=thumbnail",
-            },
-            ...prev,
-          ]);
-        } else {
-          setError(result.error);
-        }
-      }
-      setUploading(false);
-      router.refresh();
-    },
-    [router]
-  );
-
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      handleFiles(e.dataTransfer.files);
-    },
-    [handleFiles]
-  );
-  const onDragOver = useCallback((e: React.DragEvent) => e.preventDefault(), []);
-
-  const copyUrl = useCallback((url: string, id: string) => {
-    navigator.clipboard.writeText(url);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  }, []);
-
-  const selectItem = useCallback(
-    (url: string) => {
-      if (!selectMode) return;
-      if (typeof window !== "undefined" && window.opener) {
-        window.opener.postMessage({ type: "media-selected", url }, "*");
-        window.close();
-      } else {
-        copyUrl(url, "");
-      }
-    },
-    [selectMode, copyUrl]
-  );
+  const editingItem = state.editingId
+    ? state.items.find((i) => i.id === state.editingId)
+    : null;
 
   return (
     <div className="space-y-6">
-      <div
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        className="rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center"
-      >
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
-          multiple
-          className="hidden"
-          id="media-upload"
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-        <label
-          htmlFor="media-upload"
-          className="cursor-pointer text-zinc-600 hover:text-zinc-900"
-        >
-          {uploading ? "Yükleniyor..." : "Dosya seçin veya sürükleyip bırakın (max 5MB)"}
-        </label>
-      </div>
+      <UploadDropzone
+        inputRef={inputRef}
+        onFiles={handleFiles}
+        disabled={isUploading}
+      />
 
-      {error && (
+      {state.error && (
         <p className="rounded bg-red-100 px-3 py-2 text-sm text-red-800">
-          {error}
+          {state.error}
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {items.map((m) => (
-          <div
-            key={m.id}
-            className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm"
-          >
+      {!selectMode && (
+        <div className="flex flex-wrap items-center gap-2">
+          {!state.bulkSelectMode ? (
             <button
               type="button"
-              className="block w-full text-left"
-              onClick={() => selectMode && selectItem(m.url)}
+              onClick={startBulkSelect}
+              className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
             >
-              <div className="aspect-square bg-zinc-100">
-                {m.mimeType?.startsWith("image/") ? (
-                  <img
-                    src={m.thumbnailUrl}
-                    alt={m.filename}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-zinc-400">
-                    Dosya
-                  </div>
-                )}
-              </div>
-              <p className="truncate px-2 py-1 text-xs text-zinc-600">
-                {m.filename}
-              </p>
+              Seç
             </button>
-            {!selectMode && (
-              <div className="border-t border-zinc-100 p-2">
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={cancelBulkSelect}
+                className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
+              >
+                Seçimi kaldır
+              </button>
+              {state.selectedIds.size > 0 && (
                 <button
                   type="button"
-                  onClick={() => copyUrl(m.url, m.id)}
-                  className="w-full rounded bg-zinc-100 px-2 py-1 text-xs hover:bg-zinc-200"
+                  onClick={handleBulkDelete}
+                  disabled={state.bulkDeleting}
+                  className="rounded border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
                 >
-                  {copiedId === m.id ? "Kopyalandı" : "URL kopyala"}
+                  {state.bulkDeleting ? "Siliniyor..." : `Seçilenleri sil (${state.selectedIds.size})`}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      <MediaGrid
+        listItems={listItems}
+        selectMode={selectMode}
+        bulkSelectMode={state.bulkSelectMode}
+        selectedIds={state.selectedIds}
+        copiedId={state.copiedId}
+        deletingId={state.deletingId}
+        retryingId={state.retryingId}
+        onToggleSelect={toggleBulkSelect}
+        onSelectItem={selectItem}
+        onCopyUrl={copyUrl}
+        onDelete={handleDelete}
+        onEdit={setEditingId}
+        onRetry={handleRetry}
+      />
+
+      {editingItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setEditingId(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-media-title"
+        >
+          <div
+            className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="edit-media-title" className="mb-4 text-lg font-semibold">
+              Medyayı düzenle
+            </h2>
+            <form
+              className="space-y-4"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                await handleEditSubmit(editingItem.id, new FormData(e.currentTarget));
+              }}
+            >
+              <label className="block">
+                <span className="text-sm font-medium text-zinc-700">Dosya adı</span>
+                <input
+                  type="text"
+                  name="filename"
+                  defaultValue={editingItem.filename}
+                  className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+                  required
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-zinc-700">Alt metin (isteğe bağlı)</span>
+                <input
+                  type="text"
+                  name="alt"
+                  defaultValue={editingItem.alt ?? ""}
+                  placeholder="Görsel açıklaması"
+                  className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+                />
+              </label>
+              {state.editError && (
+                <p className="rounded bg-red-50 px-2 py-1 text-sm text-red-700">{state.editError}</p>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingId(null)}
+                  className="rounded border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-50"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="rounded bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+                >
+                  Kaydet
                 </button>
               </div>
-            )}
+            </form>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
-      {items.length === 0 && (
+      {listItems.length === 0 && (
         <p className="py-8 text-center text-zinc-500">
           Henüz medya yok. Yüklemek için yukarıyı kullanın.
         </p>

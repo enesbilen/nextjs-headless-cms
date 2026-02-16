@@ -1,140 +1,158 @@
 "use server";
 
-import { createId } from "@paralleldrive/cuid2";
-import { createHash } from "crypto";
-import { Readable } from "stream";
+import { revalidatePath } from "next/cache";
 import { getSession } from "@/core/session";
 import { db } from "@/core/db";
-import { localStorage } from "@/core/media/storage";
 import { getMediaUrl } from "@/core/media/url";
-import { optimizeImage, generateImageVariants } from "@/core/media/optimize";
 import {
-  checkMimeAndExtension,
-  MAX_UPLOAD_BYTES,
-  MAX_SVG_BYTES,
-  isImageMime,
-} from "@/core/media/mime";
-import { sanitizeSvg } from "@/core/media/svg-sanitize";
+  createMediaFromUpload as createMediaFromUploadService,
+  deleteMedia as deleteMediaService,
+  replaceMedia as replaceMediaService,
+  retryProcessing as retryProcessingService,
+} from "@/core/media/media-service";
+import type { MediaDTO, FailedUpload } from "./media.types";
 
-export type UploadMediaResult =
-  | { ok: true; media: { id: string; url: string; filename: string; width: number | null; height: number | null } }
-  | { ok: false; error: string };
+/** Upload result: JSON-serializable only. No Date, no undefined in required fields. */
+export type UploadBatchResult = {
+  uploaded: MediaDTO[];
+  failed: FailedUpload[];
+  /** Global error (e.g. auth); no per-file results. */
+  error?: string;
+};
 
-export async function uploadMedia(
-  formData: FormData
-): Promise<UploadMediaResult> {
+export async function uploadMedia(formData: FormData): Promise<UploadBatchResult> {
   const session = await getSession();
   if (!session.userId) {
-    return { ok: false, error: "Unauthorized" };
+    return { uploaded: [], failed: [], error: "Yetkisiz" };
   }
 
-  const file = formData.get("file");
-  if (!file || !(file instanceof File)) {
-    return { ok: false, error: "No file provided" };
+  const rawFiles = formData.getAll("file");
+  const files = rawFiles.filter((f): f is File => f instanceof File);
+  if (files.length === 0) {
+    return { uploaded: [], failed: [] };
   }
 
-  if (file.size > MAX_UPLOAD_BYTES) {
-    return { ok: false, error: "File too large (max 5MB)" };
-  }
+  const uploaded: MediaDTO[] = [];
+  const failed: FailedUpload[] = [];
 
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(new Uint8Array(arrayBuffer)) as Buffer;
-
-  const mimeCheck = await checkMimeAndExtension(buffer);
-  if (!mimeCheck.ok) {
-    return { ok: false, error: mimeCheck.reason };
-  }
-
-  const ext = mimeCheck.ext;
-  const mimeType = mimeCheck.mime;
-  const isSvg = mimeType === "image/svg+xml";
-
-  if (isSvg && buffer.length > MAX_SVG_BYTES) {
-    return { ok: false, error: "SVG file too large (max 1MB)" };
-  }
-
-  let width: number | null = null;
-  let height: number | null = null;
-  let finalBuffer: Buffer;
-  let finalMime: string;
-  let checksum: string;
-
-  if (isSvg) {
-    const text = buffer.toString("utf-8");
+  for (const file of files) {
     try {
-      const sanitized = sanitizeSvg(text);
-      finalBuffer = Buffer.from(sanitized, "utf-8");
-    } catch {
-      return { ok: false, error: "SVG rejected: invalid or unsafe content" };
-    }
-    finalMime = "image/svg+xml";
-    checksum = createHash("sha256").update(finalBuffer).digest("hex");
-  } else {
-    checksum = createHash("sha256").update(buffer).digest("hex");
-    finalMime = mimeType;
-    if (isImageMime(mimeType)) {
-      const optimized = await optimizeImage(buffer, mimeType);
-      finalBuffer = optimized.buffer;
-      finalMime = optimized.mimeType;
-      width = optimized.width;
-      height = optimized.height;
-    } else {
-      finalBuffer = buffer;
+      const result = await createMediaFromUploadService(file, session.userId);
+      if (result.ok) {
+        const url = getMediaUrl(result.id, result, result.version);
+        uploaded.push({
+          id: result.id,
+          url,
+          filename: result.filename,
+          mimeType: result.mimeType ?? null,
+          width: result.width ?? null,
+          height: result.height ?? null,
+          status: result.status === "ready" ? "ready" : "processing",
+          version: result.version,
+          deduplicated: result.deduplicated === true,
+        });
+      } else {
+        const code: FailedUpload["code"] =
+          result.error.includes("büyük") || result.error.includes("Dosya") ? "validation"
+          : result.error.includes("işlenemedi") || result.error.includes("yazılamadı") ? "processing"
+          : undefined;
+        failed.push({ filename: file.name, reason: result.error, code });
+      }
+    } catch (e) {
+      failed.push({
+        filename: file.name,
+        reason: e instanceof Error ? e.message : "Ağ hatası",
+        code: "network",
+      });
     }
   }
 
-  const id = createId();
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const baseStoragePath = `${year}/${month}/${id}.${ext}`;
+  if (uploaded.length > 0) {
+    revalidatePath("/admin/media");
+    revalidatePath("/admin");
+  }
 
-  const stream = Readable.from(finalBuffer);
-  await localStorage.write(baseStoragePath, stream);
+  return { uploaded, failed };
+}
 
-  await db.media.create({
-    data: {
-      id,
-      filename: file.name,
-      mimeType: finalMime,
-      storagePath: baseStoragePath,
-      width,
-      height,
-      checksum,
-      userId: session.userId,
-    },
+export type DeleteMediaResult = { ok: true } | { ok: false; error: string };
+
+export async function deleteMedia(mediaId: string): Promise<DeleteMediaResult> {
+  const session = await getSession();
+  if (!session.userId) {
+    return { ok: false, error: "Yetkisiz" };
+  }
+  const result = await deleteMediaService(mediaId);
+  if (result.ok) {
+    revalidatePath("/admin/media");
+    revalidatePath("/admin");
+  }
+  return result;
+}
+
+export type RetryMediaResult = { ok: true } | { ok: false; error: string };
+
+export async function retryMedia(mediaId: string): Promise<RetryMediaResult> {
+  const session = await getSession();
+  if (!session.userId) {
+    return { ok: false, error: "Yetkisiz" };
+  }
+  const result = await retryProcessingService(mediaId);
+  if (result.ok) {
+    revalidatePath("/admin/media");
+    revalidatePath("/admin");
+  }
+  return result;
+}
+
+export type ReplaceMediaResult = { ok: true; version: number } | { ok: false; error: string };
+
+export async function replaceMedia(mediaId: string, formData: FormData): Promise<ReplaceMediaResult> {
+  const session = await getSession();
+  if (!session.userId) {
+    return { ok: false, error: "Yetkisiz" };
+  }
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Dosya gerekli" };
+  }
+  const result = await replaceMediaService(mediaId, file);
+  if (result.ok) {
+    revalidatePath("/admin/media");
+    revalidatePath("/admin");
+  }
+  return result;
+}
+
+export type UpdateMediaResult =
+  | { ok: true; filename: string }
+  | { ok: false; error: string };
+
+export async function updateMedia(
+  mediaId: string,
+  formData: FormData
+): Promise<UpdateMediaResult> {
+  const session = await getSession();
+  if (!session.userId) {
+    return { ok: false, error: "Yetkisiz" };
+  }
+  const media = await db.media.findUnique({
+    where: { id: mediaId },
+    select: { id: true, status: true },
   });
-
-  if (isImageMime(mimeType) && !isSvg) {
-    const variants = await generateImageVariants(finalBuffer, baseStoragePath);
-    for (const v of variants) {
-      await localStorage.write(
-        v.storagePath,
-        Readable.from(v.buffer)
-      );
-    }
-    await db.mediaVariant.createMany({
-      data: variants.map((v) => ({
-        mediaId: id,
-        type: v.type,
-        storagePath: v.storagePath,
-        mimeType: v.mimeType,
-        width: v.width,
-        height: v.height,
-        size: v.size,
-      })),
-    });
+  if (!media || media.status !== "ready") {
+    return { ok: false, error: "Medya bulunamadı veya düzenlenemez" };
   }
-
-  const url = getMediaUrl(id, file.name);
-  return {
-    ok: true,
-    media: {
-      id,
-      url,
-      filename: file.name,
-      width,
-      height,
-    },
-  };
+  const filename = (formData.get("filename") as string)?.trim();
+  const alt = (formData.get("alt") as string)?.trim() || null;
+  if (!filename) {
+    return { ok: false, error: "Dosya adı gerekli" };
+  }
+  await db.media.update({
+    where: { id: mediaId },
+    data: { filename, alt },
+  });
+  revalidatePath("/admin/media");
+  revalidatePath("/admin");
+  return { ok: true, filename };
 }

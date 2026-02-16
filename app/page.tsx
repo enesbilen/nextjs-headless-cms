@@ -44,7 +44,7 @@ export default async function HomePage() {
       status: true,
       coverImageId: true,
       coverImage: {
-        select: { id: true, filename: true, alt: true, width: true, height: true, mimeType: true },
+        select: { id: true, filename: true, storagePath: true, alt: true, width: true, height: true, mimeType: true },
       },
     },
   });

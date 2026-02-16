@@ -21,3 +21,10 @@ enum VariantType {
   WEBP
   AVIF
 }
+
+enum MediaStatus {
+  processing
+  ready
+  failed
+  deleted
+}

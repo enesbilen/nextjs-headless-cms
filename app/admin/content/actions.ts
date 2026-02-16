@@ -2,6 +2,7 @@
 
 import { invalidate } from "@/core/cache";
 import { db } from "@/core/db";
+import { syncPageMediaUsageInTx } from "@/core/media/media-usage";
 import { normalizePath } from "@/core/resolve";
 import {
   generateSlug,
@@ -39,8 +40,12 @@ export async function createContent(formData: FormData) {
     return { error: "Bu slug zaten kullanılıyor" };
   }
 
-  const content = await db.page.create({
-    data: { title, slug, body, status },
+  const content = await db.$transaction(async (tx) => {
+    const created = await tx.page.create({
+      data: { title, slug, body, status },
+    });
+    await syncPageMediaUsageInTx(tx, created.id, body);
+    return created;
   });
 
   if (status === "PUBLISHED") {
@@ -83,9 +88,13 @@ export async function updateContent(
     return { error: "Bu slug zaten başka bir içerikte kullanılıyor" };
   }
 
-  const content = await db.page.update({
-    where: { id },
-    data: { title, slug, body, status },
+  const content = await db.$transaction(async (tx) => {
+    const updated = await tx.page.update({
+      where: { id },
+      data: { title, slug, body, status },
+    });
+    await syncPageMediaUsageInTx(tx, updated.id, body);
+    return updated;
   });
 
   if (status === "PUBLISHED" || previousStatus === "PUBLISHED") {

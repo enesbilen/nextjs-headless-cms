@@ -1,23 +1,34 @@
 model Media {
-  id          String    @id @default(cuid())
-  filename    String
-  mimeType    String?
-  storagePath String
-  width       Int?
-  height      Int?
-  alt         String?   @db.Text
-  checksum    String
-  userId      String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  id            String       @id @default(cuid())
+  filename      String
+  mimeType      String?
+  storagePath   String
+  width         Int?
+  height        Int?
+  alt           String?      @db.Text
+  checksum      String
+  userId        String?
+  status        MediaStatus  @default(processing)
+  version       Int          @default(1)
+  fileSize      BigInt?
+  processingAt  DateTime?
+  deletedAt     DateTime?
+  deleteAfter   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   user      User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   variants  MediaVariant[]
+  usages    MediaUsage[]
   pages     Page[]          @relation("PageCoverImage")
   posts     Post[]          @relation("PostCoverImage")
 
   @@index([userId])
-  @@index([deletedAt])
+  @@index([checksum])
   @@index([createdAt])
+  @@index([status])
+  @@index([processingAt])
+  @@index([status, processingAt])
+  @@index([deleteAfter])
+  @@index([storagePath])
 }

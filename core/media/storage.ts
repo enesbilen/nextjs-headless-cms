@@ -1,3 +1,4 @@
+import "server-only";
 import { Readable } from "stream";
 import { createReadStream, createWriteStream, mkdir, access, stat } from "fs";
 import { dirname, join } from "path";
@@ -14,14 +15,14 @@ export interface MediaStorage {
   size(storagePath: string): Promise<number>;
 }
 
-function getStorageRoot(): string {
+export function getStorageRoot(): string {
   const root =
     process.env.MEDIA_STORAGE_PATH ||
     join(process.cwd(), "data", "uploads");
   return root;
 }
 
-function resolvePath(storagePath: string): string {
+export function resolvePath(storagePath: string): string {
   const root = getStorageRoot();
   return join(root, storagePath);
 }

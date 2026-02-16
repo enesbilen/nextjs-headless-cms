@@ -1,14 +1,16 @@
 import { db } from "@/core/db";
 import { MediaImage } from "@/core/media/MediaImage";
+import { getCanonicalFilename } from "@/core/media/public-utils";
 
 export default async function MediaTestPage() {
   const mediaList = await db.media.findMany({
-    where: { deletedAt: null },
+    where: { status: "ready" },
     orderBy: { createdAt: "desc" },
     take: 6,
     select: {
       id: true,
       filename: true,
+      storagePath: true,
       width: true,
       height: true,
       alt: true,
@@ -30,7 +32,7 @@ export default async function MediaTestPage() {
           <div className="relative h-[400px] w-full overflow-hidden rounded-lg bg-zinc-100">
             <MediaImage
               mediaId={largeMedia.id}
-              filename={largeMedia.filename}
+              filename={getCanonicalFilename(largeMedia)}
               alt={largeMedia.alt ?? ""}
               fill
               sizes="(max-width: 768px) 100vw, 1024px"
@@ -45,7 +47,7 @@ export default async function MediaTestPage() {
           <h2 className="mb-4 text-lg font-semibold">Small image (fixed size)</h2>
           <MediaImage
             mediaId={smallMedia.id}
-            filename={smallMedia.filename}
+            filename={getCanonicalFilename(smallMedia)}
             alt={smallMedia.alt ?? ""}
             width={smallMedia.width ?? 300}
             height={smallMedia.height ?? 200}
@@ -65,7 +67,7 @@ export default async function MediaTestPage() {
             >
               <MediaImage
                 mediaId={m.id}
-                filename={m.filename}
+                filename={getCanonicalFilename(m)}
                 alt={m.alt ?? ""}
                 fill
                 sizes="(max-width: 768px) 50vw, 33vw"

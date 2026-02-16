@@ -31,7 +31,12 @@ const DANGEROUS_EXTENSIONS = new Set([
 ]);
 
 function isSvgCandidate(text: string): boolean {
-  const trimmed = text.trimStart();
+  let trimmed = text.trimStart();
+  // Skip optional XML declaration (e.g. <?xml version="1.0" encoding="UTF-8"?>)
+  if (trimmed.startsWith("<?xml")) {
+    const close = trimmed.indexOf("?>");
+    if (close !== -1) trimmed = trimmed.slice(close + 2).trimStart();
+  }
   if (!trimmed.toLowerCase().startsWith("<svg")) return false;
   if (!trimmed.toLowerCase().includes("<svg")) return false;
   if (!trimmed.includes('xmlns="http://www.w3.org/2000/svg"') && !trimmed.includes("xmlns='http://www.w3.org/2000/svg'")) return false;
@@ -62,6 +67,11 @@ export async function checkMimeAndExtension(
     return { ok: false, reason: "File type not allowed" };
   }
   if (!ALLOWED_MIMES.has(detected.mime)) {
+    // SVG is often detected as application/xml when it starts with <?xml; allow by content
+    const text = buffer.toString("utf-8");
+    if (isSvgCandidate(text)) {
+      return { ok: true, mime: "image/svg+xml", ext: "svg" };
+    }
     return { ok: false, reason: "Unsupported file type" };
   }
   return { ok: true, mime: detected.mime, ext };

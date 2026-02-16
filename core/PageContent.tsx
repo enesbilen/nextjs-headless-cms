@@ -1,9 +1,11 @@
 import { MediaImage } from "@/core/media/MediaImage";
 import { ContentBody } from "@/core/ContentBody";
+import { getCanonicalFilename } from "@/core/media/public-utils";
 
 type CoverImage = {
   id: string;
   filename: string;
+  storagePath: string;
   alt?: string | null;
   width?: number | null;
   height?: number | null;
@@ -37,7 +39,7 @@ export function PageContent({
         <div className="relative w-full overflow-hidden rounded-lg my-4" style={{ aspectRatio: "16/9" }}>
           <MediaImage
             mediaId={coverImage.id}
-            filename={coverImage.filename}
+            filename={getCanonicalFilename(coverImage)}
             alt={coverImage.alt ?? ""}
             fill
             sizes="(max-width: 768px) 100vw, 800px"

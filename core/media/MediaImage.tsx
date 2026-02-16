@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { getMediaUrl } from "./url";
+import { getMediaUrl, getMediaUrlFromFilename } from "./url";
 
 export type MediaImageProps = {
   mediaId: string;
+  /** Canonical filename (slug + disk extension). Prefer passing media and using getCanonicalFilename(media). */
   filename: string;
   alt?: string;
   width?: number;
@@ -18,7 +19,7 @@ export type MediaImageProps = {
 };
 
 /**
- * Wraps next/image for CMS media. Uses getMediaUrl(mediaId, filename).
+ * Wraps next/image for CMS media. URL uses canonical filename; pass getCanonicalFilename(media) when you have media.
  * If width/height missing and not fill → falls back to fill mode with object-cover.
  * Safe for server and client (uses "use client" for Image; can be imported from RSC and passed to client).
  */
@@ -34,7 +35,7 @@ export function MediaImage({
   className,
   mimeType,
 }: MediaImageProps) {
-  const src = getMediaUrl(mediaId, filename);
+  const src = getMediaUrlFromFilename(mediaId, filename);
   const unoptimized =
     mimeType === "image/svg+xml" || filename.toLowerCase().endsWith(".svg");
   const useFill = fill ?? (width == null && height == null);

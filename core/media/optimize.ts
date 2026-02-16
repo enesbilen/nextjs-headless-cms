@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import type { VariantType } from "@prisma/client";
+import { getVariantStoragePathFromBase } from "@/core/media/server/path-utils";
 
 const MAX_DIMENSION = 1920;
 const QUALITY = 85;
@@ -53,17 +54,8 @@ export type VariantResult = {
 };
 
 /**
- * Generate variant storage path from base path (e.g. "2026/02/abc123.jpg" -> "2026/02/abc123-thumb.jpg")
- */
-function variantPath(basePath: string, type: string, ext: string): string {
-  const lastDot = basePath.lastIndexOf(".");
-  const base = lastDot >= 0 ? basePath.slice(0, lastDot) : basePath;
-  const suffix = type.toLowerCase();
-  return `${base}-${suffix}.${ext}`;
-}
-
-/**
  * Generate all image variants: THUMBNAIL, MEDIUM, LARGE, WEBP, AVIF.
+ * Paths from path-utils (pattern baseName__variant.ext).
  * baseStoragePath e.g. "2026/02/abc123.jpg"
  */
 export async function generateImageVariants(
@@ -86,7 +78,7 @@ export async function generateImageVariants(
       .jpeg({ quality: QUALITY })
       .toBuffer();
     const meta = await sharp(resized).metadata();
-    const path = variantPath(baseStoragePath, type, "jpg");
+    const path = getVariantStoragePathFromBase(baseStoragePath, type.toLowerCase(), "jpg");
     results.push({
       type,
       storagePath: path,
@@ -106,7 +98,7 @@ export async function generateImageVariants(
   const webpMeta = await sharp(webpBuffer).metadata();
   results.push({
     type: "WEBP",
-    storagePath: variantPath(baseStoragePath, "webp", "webp"),
+    storagePath: getVariantStoragePathFromBase(baseStoragePath, "webp", "webp"),
     buffer: webpBuffer,
     mimeType: "image/webp",
     width: webpMeta.width ?? 0,
@@ -122,7 +114,7 @@ export async function generateImageVariants(
   const avifMeta = await sharp(avifBuffer).metadata();
   results.push({
     type: "AVIF",
-    storagePath: variantPath(baseStoragePath, "avif", "avif"),
+    storagePath: getVariantStoragePathFromBase(baseStoragePath, "avif", "avif"),
     buffer: avifBuffer,
     mimeType: "image/avif",
     width: avifMeta.width ?? 0,

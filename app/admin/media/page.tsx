@@ -2,7 +2,7 @@ import { db } from "@/core/db";
 import { getMediaUrl } from "@/core/media/url";
 import { AdminContent } from "../_components/AdminContent";
 import { AdminPageHeader } from "../_components/AdminPageHeader";
-import { MediaManager } from "./MediaManager";
+import { MediaManager, type MediaItem } from "./MediaManager";
 import Link from "next/link";
 
 const PER_PAGE = 24;
@@ -19,27 +19,38 @@ export default async function AdminMediaPage({ searchParams }: PageProps) {
 
   const [items, total] = await Promise.all([
     db.media.findMany({
-      where: { deletedAt: null },
+      where: { status: { in: ["ready", "failed"] }, deletedAt: null },
       orderBy: { createdAt: "desc" },
       skip,
       take: PER_PAGE,
       select: {
         id: true,
         filename: true,
+        storagePath: true,
         mimeType: true,
         width: true,
         height: true,
+        alt: true,
         createdAt: true,
+        status: true,
+        version: true,
       },
     }),
-    db.media.count({ where: { deletedAt: null } }),
+    db.media.count({ where: { status: { in: ["ready", "failed"] }, deletedAt: null } }),
   ]);
 
   const totalPages = Math.ceil(total / PER_PAGE);
-  const mediaWithUrl = items.map((m) => ({
-    ...m,
-    url: getMediaUrl(m.id, m.filename),
-    thumbnailUrl: getMediaUrl(m.id, m.filename) + "?variant=thumbnail",
+  const mediaWithUrl: MediaItem[] = items.map((m) => ({
+    id: m.id,
+    filename: m.filename,
+    mimeType: m.mimeType,
+    width: m.width,
+    height: m.height,
+    alt: m.alt,
+    status: m.status === "ready" || m.status === "failed" ? m.status : "ready",
+    version: m.version,
+    url: getMediaUrl(m.id, m, m.version ?? undefined),
+    thumbnailUrl: getMediaUrl(m.id, m, m.version ?? undefined) + "?variant=thumbnail",
   }));
 
   return (

@@ -1,0 +1,14 @@
+model MediaUsage {
+  id         String   @id @default(cuid())
+  mediaId    String
+  entityType String   // 'page', 'post', 'product', etc.
+  entityId   String
+  field      String   // 'content', 'thumbnail', 'gallery'
+  createdAt  DateTime @default(now())
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaId, entityType, entityId, field])
+  @@index([mediaId])
+  @@index([entityType, entityId])
+}
