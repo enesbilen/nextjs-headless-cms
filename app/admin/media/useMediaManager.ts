@@ -3,8 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useReducer } from "react";
 import { useFeedback } from "@/core/ui/FeedbackContext";
 import { uploadMedia, deleteMedia, updateMedia, retryMedia } from "./actions";
-import type { MediaItem, MediaState, MediaAction, ListItem, FailedUpload } from "./media.types";
+import type { MediaItem, MediaState, MediaAction, ListItem, FailedUpload, RejectedFile } from "./media.types";
 import { useScheduledRefresh } from "./useScheduledRefresh";
+
+// Constants for validation
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file
+const MAX_BATCH_SIZE = 10 * 1024 * 1024; // 10MB total batch size (Next.js bodySizeLimit)
 
 function mediaReducer(state: MediaState, action: MediaAction): MediaState {
   switch (action.type) {
@@ -77,6 +81,10 @@ function mediaReducer(state: MediaState, action: MediaAction): MediaState {
         detailId: null,
         bulkSelectMode: false,
       };
+    case "SET_REJECTED_FILES":
+      return { ...state, rejectedFiles: action.payload };
+    case "CLEAR_REJECTED_FILES":
+      return { ...state, rejectedFiles: [] };
     default:
       return state;
   }
@@ -104,6 +112,7 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
     selectedIds: new Set<string>(),
     bulkDeleting: false,
     retryingId: null,
+    rejectedFiles: [],
   });
 
   // When server data changes (new search/filter/page), reset selection so UI stays in sync
@@ -118,57 +127,129 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
   const handleFiles = useCallback(
     async (files: FileList | File[] | null) => {
       if (!files?.length) return;
+
       const fileArray = Array.from(files);
-      const tempIds = fileArray.map(() => `upload-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
-      dispatch({
-        type: "UPLOAD_START",
-        payload: fileArray.map((f, i) => ({ tempId: tempIds[i], filename: f.name })),
-      });
 
-      const formData = new FormData();
-      fileArray.forEach((f) => formData.append("file", f));
-      const result = await uploadMedia(formData);
+      // Client-side validation BEFORE upload
+      const validFiles: File[] = [];
+      const rejected: RejectedFile[] = [];
+      let totalSize = 0;
 
-      resetFileInput();
+      for (const file of fileArray) {
+        // Check individual file size
+        if (file.size > MAX_FILE_SIZE) {
+          rejected.push({
+            filename: file.name,
+            reason: `Dosya çok büyük (${(file.size / 1024 / 1024).toFixed(2)} MB, maks. 5 MB)`,
+            size: file.size,
+          });
+          continue;
+        }
 
-      if (result.error) {
-        dispatch({
-          type: "UPLOAD_FAIL",
-          payload: {
-            tempIds,
-            failed: [{ filename: fileArray[0].name, reason: result.error, code: "network" }],
-          },
-        });
-        feedback.showError(result.error);
-        return;
+        // Check if adding this file would exceed batch size
+        if (totalSize + file.size > MAX_BATCH_SIZE) {
+          rejected.push({
+            filename: file.name,
+            reason: `Toplam yükleme boyutu limiti aşıldı (maks. 10 MB)`,
+            size: file.size,
+          });
+          continue;
+        }
+
+        validFiles.push(file);
+        totalSize += file.size;
       }
 
-      if (result.uploaded.length > 0) {
-        const deduplicatedCount = result.uploaded.filter((u) => u.deduplicated).length;
-        dispatch({ type: "UPLOAD_SUCCESS", payload: { tempIds } });
-        requestRefresh();
-        if (deduplicatedCount > 0) {
-          feedback.showInfo(
-            deduplicatedCount === 1
-              ? "Bu dosya zaten yüklenmiş."
-              : `${deduplicatedCount} dosya zaten kütüphanede.`
-          );
+      // Show rejected files
+      if (rejected.length > 0) {
+        dispatch({ type: "SET_REJECTED_FILES", payload: rejected });
+
+        if (rejected.length === 1) {
+          feedback.showError(rejected[0].reason);
         } else {
-          feedback.showSuccess(
-            result.uploaded.length === 1
-              ? "Dosya yüklendi."
-              : `${result.uploaded.length} dosya yüklendi.`
+          feedback.showError(
+            `${rejected.length} dosya reddedildi. Lütfen dosya boyutlarını kontrol edin.`
           );
         }
       }
 
-      if (result.failed.length > 0) {
-        dispatch({ type: "UPLOAD_FAIL", payload: { tempIds, failed: result.failed } });
-        const msg =
-          result.failed.length === 1
-            ? result.failed[0].reason
-            : result.failed.map((f) => `${f.filename}: ${f.reason}`).join("; ");
-        feedback.showError(msg);
+      // If no valid files, reset input and return
+      if (validFiles.length === 0) {
+        resetFileInput();
+        return;
+      }
+
+      // Proceed with valid files
+      const tempIds = validFiles.map(() => `upload-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
+      dispatch({
+        type: "UPLOAD_START",
+        payload: validFiles.map((f, i) => ({ tempId: tempIds[i], filename: f.name })),
+      });
+
+      const formData = new FormData();
+      validFiles.forEach((f) => formData.append("file", f));
+
+      try {
+        const result = await uploadMedia(formData);
+
+        resetFileInput();
+
+        if (result.error) {
+          dispatch({
+            type: "UPLOAD_FAIL",
+            payload: {
+              tempIds,
+              failed: [{ filename: validFiles[0].name, reason: result.error, code: "network" }],
+            },
+          });
+          feedback.showError(result.error);
+          return;
+        }
+
+        if (result.uploaded.length > 0) {
+          const deduplicatedCount = result.uploaded.filter((u) => u.deduplicated).length;
+          dispatch({ type: "UPLOAD_SUCCESS", payload: { tempIds } });
+          requestRefresh();
+          if (deduplicatedCount > 0) {
+            feedback.showInfo(
+              deduplicatedCount === 1
+                ? "Bu dosya zaten yüklenmiş."
+                : `${deduplicatedCount} dosya zaten kütüphanede.`
+            );
+          } else {
+            feedback.showSuccess(
+              result.uploaded.length === 1
+                ? "Dosya yüklendi."
+                : `${result.uploaded.length} dosya yüklendi.`
+            );
+          }
+        }
+
+        if (result.failed.length > 0) {
+          dispatch({ type: "UPLOAD_FAIL", payload: { tempIds, failed: result.failed } });
+          const msg =
+            result.failed.length === 1
+              ? result.failed[0].reason
+              : result.failed.map((f) => `${f.filename}: ${f.reason}`).join("; ");
+          feedback.showError(msg);
+        }
+      } catch (error) {
+        // Handle network errors (Failed to fetch, etc.)
+        resetFileInput();
+        dispatch({
+          type: "UPLOAD_FAIL",
+          payload: {
+            tempIds,
+            failed: validFiles.map((f) => ({
+              filename: f.name,
+              reason: "Ağ hatası: Sunucuya bağlanılamadı",
+              code: "network" as const,
+            })),
+          },
+        });
+        feedback.showError(
+          "Yükleme başarısız: Sunucuya bağlanılamadı. Dosya boyutları çok büyük olabilir."
+        );
       }
     },
     [feedback, resetFileInput, requestRefresh]
@@ -281,6 +362,21 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
     dispatch({ type: "BULK_SELECT_MODE", payload: false });
   }, []);
 
+  const selectAll = useCallback(() => {
+    const allIds = new Set(items.map((item) => item.id));
+    items.forEach((item) => {
+      if (!state.selectedIds.has(item.id)) {
+        dispatch({ type: "TOGGLE_SELECT", payload: item.id });
+      }
+    });
+  }, [items, state.selectedIds]);
+
+  const deselectAll = useCallback(() => {
+    state.selectedIds.forEach((id) => {
+      dispatch({ type: "TOGGLE_SELECT", payload: id });
+    });
+  }, [state.selectedIds]);
+
   const handleRetry = useCallback(
     async (mediaId: string) => {
       dispatch({ type: "SET_RETRYING", payload: mediaId });
@@ -305,6 +401,10 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
     [state.uploads, items]
   );
 
+  const clearRejectedFiles = useCallback(() => {
+    dispatch({ type: "CLEAR_REJECTED_FILES", payload: undefined });
+  }, []);
+
   return {
     state,
     listItems,
@@ -319,7 +419,10 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
     toggleBulkSelect,
     handleBulkDelete,
     cancelBulkSelect,
+    selectAll,
+    deselectAll,
     handleRetry,
+    clearRejectedFiles,
     setEditingId: (id: string | null) => dispatch({ type: "SET_EDITING", payload: id }),
     setDetailId: (id: string | null) => dispatch({ type: "SET_DETAIL", payload: id }),
     setError: (err: string | null) => dispatch({ type: "SET_ERROR", payload: err }),

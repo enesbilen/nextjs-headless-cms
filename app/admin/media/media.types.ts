@@ -1,60 +1,49 @@
-/**
- * Media Manager types. JSON-serializable DTOs from server; UI state types.
- */
+export type MediaStatus = "ready" | "processing" | "failed";
 
-/** Server-returned media item (no Date, no undefined). */
+export type MediaItem = {
+  id: string;
+  filename: string;
+  mimeType: string | null;
+  url: string;
+  width: number | null;
+  height: number | null;
+  alt: string | null;
+  status: MediaStatus;
+  version: number;
+  createdAt: string;
+};
+
 export type MediaDTO = {
   id: string;
   url: string;
   filename: string;
+  mimeType: string | null;
   width: number | null;
   height: number | null;
-  mimeType: string | null;
-  status: "ready" | "processing" | "failed";
-  version?: number;
-  /** True when upload was deduplicated (same file already in library). */
+  status: MediaStatus;
+  version: number;
   deduplicated?: boolean;
 };
 
-/** Failed upload entry. */
 export type FailedUpload = {
   filename: string;
   reason: string;
-  /** Error category for UI. */
-  code?: "network" | "validation" | "processing";
+  code?: "validation" | "processing" | "network";
 };
 
-/** UI list item: either a real media or a temporary upload placeholder. */
-export type MediaItem = MediaDTO & {
-  thumbnailUrl: string;
-  alt?: string | null;
-  /** Present when from server (RSC); not used in client state. */
-  createdAt?: string;
+export type RejectedFile = {
+  filename: string;
+  reason: string;
+  size: number;
 };
 
-/** Temporary item shown while a file is uploading/processing. */
 export type UploadItem = {
   tempId: string;
   filename: string;
   progress: number;
-  status: "uploading" | "processing" | "ready" | "failed";
-  /** Set when server responds (ready/failed). */
-  mediaId?: string;
-  error?: string;
+  status: "uploading" | "processing";
 };
 
-/** Combined list for grid: real items + temp uploads (temp first). */
-export type ListItem = { type: "media"; item: MediaItem } | { type: "upload"; item: UploadItem };
-
-export function isUploadItem(listItem: ListItem): listItem is { type: "upload"; item: UploadItem } {
-  return listItem.type === "upload";
-}
-
-export function isMediaItem(listItem: ListItem): listItem is { type: "media"; item: MediaItem } {
-  return listItem.type === "media";
-}
-
-/** Reducer state. Media list comes from server (props), not stored here. */
 export type MediaState = {
   uploads: UploadItem[];
   error: string | null;
@@ -67,6 +56,7 @@ export type MediaState = {
   selectedIds: Set<string>;
   bulkDeleting: boolean;
   retryingId: string | null;
+  rejectedFiles: RejectedFile[];
 };
 
 export type MediaAction =
@@ -80,8 +70,23 @@ export type MediaAction =
   | { type: "SET_DELETING"; payload: string | null }
   | { type: "BULK_SELECT_MODE"; payload: boolean }
   | { type: "TOGGLE_SELECT"; payload: string }
-  | { type: "BULK_DELETE_DONE"; payload: void }
+  | { type: "BULK_DELETE_DONE"; payload: undefined }
   | { type: "SET_BULK_DELETING"; payload: boolean }
   | { type: "SET_RETRYING"; payload: string | null }
   | { type: "SET_DETAIL"; payload: string | null }
-  | { type: "RESET_SELECTION"; payload: void };
+  | { type: "RESET_SELECTION"; payload: undefined }
+  | { type: "SET_REJECTED_FILES"; payload: RejectedFile[] }
+  | { type: "CLEAR_REJECTED_FILES"; payload: undefined };
+
+export type ListItem =
+  | { type: "upload"; item: UploadItem }
+  | { type: "media"; item: MediaItem };
+
+// Type guard functions
+export function isUploadItem(listItem: ListItem): listItem is { type: "upload"; item: UploadItem } {
+  return listItem.type === "upload";
+}
+
+export function isMediaItem(listItem: ListItem): listItem is { type: "media"; item: MediaItem } {
+  return listItem.type === "media";
+}

@@ -75,7 +75,7 @@ export function UploadDropzone({ inputRef, onFiles, disabled }: Props) {
       >
         {disabled
           ? "Yükleniyor..."
-          : "Dosya seçin veya sürükleyip bırakın (max 5MB)"}
+          : "Dosya seçin veya sürükleyip bırakın (maks. 5MB/dosya, 10MB toplam)"}
       </label>
     </div>
   );

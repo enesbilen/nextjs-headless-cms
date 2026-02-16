@@ -76,7 +76,10 @@ export function MediaManager({
     toggleBulkSelect,
     handleBulkDelete,
     cancelBulkSelect,
+    selectAll,
+    deselectAll,
     handleRetry,
+    clearRejectedFiles,
     setEditingId,
     setDetailId,
   } = useMediaManager({ items: initialItems, selectMode });
@@ -137,6 +140,46 @@ export function MediaManager({
         </p>
       )}
 
+      {state.rejectedFiles.length > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="size-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <h3 className="font-medium text-amber-900">
+                  {state.rejectedFiles.length === 1
+                    ? "1 dosya reddedildi"
+                    : `${state.rejectedFiles.length} dosya reddedildi`}
+                </h3>
+              </div>
+              <ul className="space-y-1.5 text-sm text-amber-800">
+                {state.rejectedFiles.map((file, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-amber-600 mt-0.5">•</span>
+                    <div className="flex-1">
+                      <span className="font-medium">{file.filename}</span>
+                      <span className="text-amber-700"> — {file.reason}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <button
+              type="button"
+              onClick={clearRejectedFiles}
+              className="rounded p-1 text-amber-600 hover:bg-amber-100 hover:text-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              aria-label="Uyarıyı kapat"
+            >
+              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {!selectMode && (
         <div className="flex flex-wrap items-center gap-2">
           {!state.bulkSelectMode ? (
@@ -156,15 +199,31 @@ export function MediaManager({
               >
                 Seçimi kaldır
               </button>
+              <button
+                type="button"
+                onClick={selectAll}
+                className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
+              >
+                Tümünü seç
+              </button>
               {state.selectedIds.size > 0 && (
-                <button
-                  type="button"
-                  onClick={handleBulkDelete}
-                  disabled={state.bulkDeleting}
-                  className="rounded border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
-                >
-                  {state.bulkDeleting ? "Siliniyor..." : `Seçilenleri sil (${state.selectedIds.size})`}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={deselectAll}
+                    className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
+                  >
+                    Seçimi temizle
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    disabled={state.bulkDeleting}
+                    className="rounded border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                  >
+                    {state.bulkDeleting ? "Siliniyor..." : `Seçilenleri sil (${state.selectedIds.size})`}
+                  </button>
+                </>
               )}
             </>
           )}
