@@ -7,7 +7,7 @@ export function AdminCard({
 }) {
   return (
     <div
-      className={`rounded-lg border border-zinc-200 bg-white shadow-sm ${className}`}
+      className={`rounded-xl border border-zinc-200/80 bg-white shadow-sm hover:shadow transition-shadow ${className}`}
     >
       {children}
     </div>

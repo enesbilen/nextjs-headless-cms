@@ -54,15 +54,15 @@ export function isMediaItem(listItem: ListItem): listItem is { type: "media"; it
   return listItem.type === "media";
 }
 
-/** Reducer state. */
+/** Reducer state. Media list comes from server (props), not stored here. */
 export type MediaState = {
-  items: MediaItem[];
   uploads: UploadItem[];
   error: string | null;
   copiedId: string | null;
   editingId: string | null;
   editError: string | null;
   deletingId: string | null;
+  detailId: string | null;
   bulkSelectMode: boolean;
   selectedIds: Set<string>;
   bulkDeleting: boolean;
@@ -71,11 +71,8 @@ export type MediaState = {
 
 export type MediaAction =
   | { type: "UPLOAD_START"; payload: { tempId: string; filename: string }[] }
-  | { type: "UPLOAD_SUCCESS"; payload: { tempIds: string[]; items: MediaItem[]; deduplicatedCount: number } }
+  | { type: "UPLOAD_SUCCESS"; payload: { tempIds: string[] } }
   | { type: "UPLOAD_FAIL"; payload: { tempIds: string[]; failed: FailedUpload[] } }
-  | { type: "DELETE"; payload: { id: string } }
-  | { type: "UPDATE"; payload: { id: string; filename: string; alt?: string | null } }
-  | { type: "RETRY"; payload: { id: string } }
   | { type: "SET_ERROR"; payload: string | null }
   | { type: "SET_COPIED"; payload: string | null }
   | { type: "SET_EDITING"; payload: string | null }
@@ -83,6 +80,8 @@ export type MediaAction =
   | { type: "SET_DELETING"; payload: string | null }
   | { type: "BULK_SELECT_MODE"; payload: boolean }
   | { type: "TOGGLE_SELECT"; payload: string }
-  | { type: "BULK_DELETE_DONE"; payload: string[] }
+  | { type: "BULK_DELETE_DONE"; payload: void }
   | { type: "SET_BULK_DELETING"; payload: boolean }
-  | { type: "SET_RETRYING"; payload: string | null };
+  | { type: "SET_RETRYING"; payload: string | null }
+  | { type: "SET_DETAIL"; payload: string | null }
+  | { type: "RESET_SELECTION"; payload: void };

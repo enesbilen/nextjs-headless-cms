@@ -1,26 +1,18 @@
 type AdminContentProps = {
   children: React.ReactNode;
+  /** Artık tam genişlik kullanılıyor; geriye dönük uyumluluk için prop bırakıldı, kullanılmıyor. */
   maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl";
   className?: string;
 };
 
-const maxWidthClasses = {
-  sm: "max-w-screen-sm",
-  md: "max-w-screen-md",
-  lg: "max-w-screen-lg",
-  xl: "max-w-screen-xl",
-  "2xl": "max-w-2xl",
-  "3xl": "max-w-3xl",
-  "4xl": "max-w-4xl",
-};
-
 export function AdminContent({
   children,
-  maxWidth = "4xl",
   className = "",
 }: AdminContentProps) {
   return (
-    <div className={`mx-auto p-6 ${maxWidthClasses[maxWidth]} ${className}`}>
+    <div
+      className={`w-full px-4 py-6 sm:px-6 md:px-8 lg:px-10 xl:px-12 ${className}`}
+    >
       {children}
     </div>
   );

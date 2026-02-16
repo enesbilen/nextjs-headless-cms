@@ -12,9 +12,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-zinc-100">
+    <div className="flex min-h-screen bg-zinc-100/90">
       <Sidebar />
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="min-w-0 flex-1 overflow-auto">{children}</main>
     </div>
   );
 }

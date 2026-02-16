@@ -18,6 +18,7 @@ type Props = {
   onDelete: (item: MediaItem) => void;
   onEdit: (id: string) => void;
   onRetry: (id: string) => void;
+  onOpenDetail?: (id: string) => void;
 };
 
 export function MediaGrid({
@@ -34,6 +35,7 @@ export function MediaGrid({
   onDelete,
   onEdit,
   onRetry,
+  onOpenDetail,
 }: Props) {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
@@ -53,6 +55,7 @@ export function MediaGrid({
           onDelete={onDelete}
           onEdit={onEdit}
           onRetry={onRetry}
+          onOpenDetail={onOpenDetail}
         />
       ))}
     </div>

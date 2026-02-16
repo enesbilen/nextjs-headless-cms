@@ -17,6 +17,7 @@ type MediaCardProps = {
   onDelete: (item: MediaItem) => void;
   onEdit: (id: string) => void;
   onRetry: (id: string) => void;
+  onOpenDetail?: (id: string) => void;
 };
 
 export function MediaCard({
@@ -33,6 +34,7 @@ export function MediaCard({
   onDelete,
   onEdit,
   onRetry,
+  onOpenDetail,
 }: MediaCardProps) {
   if (isUploadItem(listItem)) {
     const u = listItem.item;
@@ -65,6 +67,8 @@ export function MediaCard({
           type="button"
           className="flex w-full cursor-pointer flex-col text-left"
           onClick={() => onToggleSelect(m.id)}
+          aria-pressed={isSelected}
+          aria-label={isSelected ? `${m.filename} seçili` : `${m.filename} seç`}
         >
           <div className="relative aspect-square bg-zinc-100">
             {m.status === "failed" ? (
@@ -80,14 +84,17 @@ export function MediaCard({
             ) : (
               <div className="flex h-full items-center justify-center text-zinc-400">Dosya</div>
             )}
+            {isSelected && (
+              <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
+            )}
             <div className="absolute left-2 top-2">
               <span
-                className={`flex size-5 items-center justify-center rounded border bg-white ${
-                  isSelected ? "border-zinc-800 bg-zinc-800 text-white" : "border-zinc-400"
+                className={`flex size-6 items-center justify-center rounded-full border-2 bg-white shadow-sm ${
+                  isSelected ? "border-white bg-zinc-800 text-white" : "border-zinc-400 bg-white/90"
                 }`}
               >
                 {isSelected && (
-                  <svg className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 )}
@@ -102,12 +109,20 @@ export function MediaCard({
     );
   }
 
+  const handleImageClick = () => {
+    if (selectMode && m.status === "ready") {
+      onSelectItem(m.url);
+    } else if (!selectMode && m.status === "ready" && onOpenDetail) {
+      onOpenDetail(m.id);
+    }
+  };
+
   return (
     <div className="group relative overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md">
       <button
         type="button"
         className="block w-full text-left"
-        onClick={() => selectMode && m.status === "ready" && onSelectItem(m.url)}
+        onClick={handleImageClick}
       >
         <div className="aspect-square bg-zinc-100">
           {m.status === "failed" ? (

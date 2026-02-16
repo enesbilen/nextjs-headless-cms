@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useRef, useReducer } from "react";
+import { useRouter } from "next/navigation";
 import { useFeedback } from "@/core/ui/FeedbackContext";
 import { uploadMedia, deleteMedia, updateMedia, retryMedia } from "./actions";
-import type { MediaItem, MediaState, MediaAction, ListItem, FailedUpload, MediaDTO } from "./media.types";
+import type { MediaItem, MediaState, MediaAction, ListItem, FailedUpload } from "./media.types";
 
 function mediaReducer(state: MediaState, action: MediaAction): MediaState {
   switch (action.type) {
@@ -21,19 +22,9 @@ function mediaReducer(state: MediaState, action: MediaAction): MediaState {
       };
     }
     case "UPLOAD_SUCCESS": {
-      const { tempIds, items, deduplicatedCount } = action.payload;
+      const { tempIds } = action.payload;
       const uploads = state.uploads.filter((u) => !tempIds.includes(u.tempId));
-      const itemsPrep = items.map((dto) => ({
-        ...dto,
-        thumbnailUrl: dto.url + "?variant=thumbnail",
-        alt: null as string | null,
-      }));
-      return {
-        ...state,
-        uploads,
-        items: [...itemsPrep, ...state.items],
-        error: null,
-      };
+      return { ...state, uploads, error: null };
     }
     case "UPLOAD_FAIL": {
       const { tempIds, failed } = action.payload;
@@ -44,31 +35,6 @@ function mediaReducer(state: MediaState, action: MediaAction): MediaState {
         error: failed.length === 1 ? failed[0].reason : `${failed.length} dosya yüklenemedi`,
       };
     }
-    case "DELETE":
-      return {
-        ...state,
-        items: state.items.filter((i) => i.id !== action.payload.id),
-        deletingId: null,
-      };
-    case "UPDATE": {
-      const { id, filename, alt } = action.payload;
-      return {
-        ...state,
-        items: state.items.map((i) =>
-          i.id === id ? { ...i, filename, alt: alt ?? i.alt ?? null } : i
-        ),
-        editingId: null,
-        editError: null,
-      };
-    }
-    case "RETRY":
-      return {
-        ...state,
-        items: state.items.map((i) =>
-          i.id === action.payload.id ? { ...i, status: "ready" as const } : i
-        ),
-        retryingId: null,
-      };
     case "SET_ERROR":
       return { ...state, error: action.payload };
     case "SET_COPIED":
@@ -94,7 +60,6 @@ function mediaReducer(state: MediaState, action: MediaAction): MediaState {
     case "BULK_DELETE_DONE":
       return {
         ...state,
-        items: state.items.filter((i) => !action.payload.includes(i.id)),
         selectedIds: new Set(),
         bulkSelectMode: false,
         bulkDeleting: false,
@@ -103,41 +68,48 @@ function mediaReducer(state: MediaState, action: MediaAction): MediaState {
       return { ...state, bulkDeleting: action.payload };
     case "SET_RETRYING":
       return { ...state, retryingId: action.payload };
+    case "SET_DETAIL":
+      return { ...state, detailId: action.payload };
+    case "RESET_SELECTION":
+      return {
+        ...state,
+        selectedIds: new Set(),
+        detailId: null,
+        bulkSelectMode: false,
+      };
     default:
       return state;
   }
 }
 
-function dtoToItem(dto: MediaDTO): MediaItem {
-  return {
-    ...dto,
-    thumbnailUrl: dto.url + "?variant=thumbnail",
-    alt: null,
-  };
-}
-
 export type UseMediaManagerProps = {
-  initialItems: MediaItem[];
+  items: MediaItem[];
   selectMode: boolean;
 };
 
-export function useMediaManager({ initialItems, selectMode }: UseMediaManagerProps) {
+export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
   const feedback = useFeedback();
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [state, dispatch] = useReducer(mediaReducer, {
-    items: initialItems,
     uploads: [],
     error: null,
     copiedId: null,
     editingId: null,
     editError: null,
     deletingId: null,
+    detailId: null,
     bulkSelectMode: false,
     selectedIds: new Set<string>(),
     bulkDeleting: false,
     retryingId: null,
   });
+
+  // When server data changes (new search/filter/page), reset selection so UI stays in sync
+  useEffect(() => {
+    dispatch({ type: "RESET_SELECTION", payload: undefined });
+  }, [items]);
 
   const resetFileInput = useCallback(() => {
     if (inputRef.current) inputRef.current.value = "";
@@ -172,9 +144,9 @@ export function useMediaManager({ initialItems, selectMode }: UseMediaManagerPro
       }
 
       if (result.uploaded.length > 0) {
-        const items = result.uploaded.map(dtoToItem);
         const deduplicatedCount = result.uploaded.filter((u) => u.deduplicated).length;
-        dispatch({ type: "UPLOAD_SUCCESS", payload: { tempIds, items, deduplicatedCount } });
+        dispatch({ type: "UPLOAD_SUCCESS", payload: { tempIds } });
+        router.refresh();
         if (deduplicatedCount > 0) {
           feedback.showInfo(
             deduplicatedCount === 1
@@ -199,18 +171,22 @@ export function useMediaManager({ initialItems, selectMode }: UseMediaManagerPro
         feedback.showError(msg);
       }
     },
-    [feedback, resetFileInput]
+    [feedback, resetFileInput, router]
   );
 
   const isUploading = state.uploads.some(
     (u) => u.status === "uploading" || u.status === "processing"
   );
 
-  const copyUrl = useCallback((url: string, id: string) => {
-    navigator.clipboard.writeText(url);
-    dispatch({ type: "SET_COPIED", payload: id });
-    setTimeout(() => dispatch({ type: "SET_COPIED", payload: null }), 2000);
-  }, []);
+  const copyUrl = useCallback(
+    (url: string, id: string) => {
+      navigator.clipboard.writeText(url);
+      dispatch({ type: "SET_COPIED", payload: id });
+      setTimeout(() => dispatch({ type: "SET_COPIED", payload: null }), 2000);
+      feedback.showSuccess("URL kopyalandı");
+    },
+    [feedback]
+  );
 
   const selectItem = useCallback(
     (url: string) => {
@@ -229,7 +205,8 @@ export function useMediaManager({ initialItems, selectMode }: UseMediaManagerPro
     async (item: MediaItem) => {
       const confirmed = await feedback.confirm({
         title: "Medyayı sil",
-        message: `"${item.filename}" öğesini kalıcı olarak silmek istediğinize emin misiniz?`,
+        message:
+          "Bu dosyayı kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.",
         confirmLabel: "Sil",
         cancelLabel: "İptal",
         variant: "danger",
@@ -238,7 +215,9 @@ export function useMediaManager({ initialItems, selectMode }: UseMediaManagerPro
       dispatch({ type: "SET_DELETING", payload: item.id });
       const result = await deleteMedia(item.id);
       if (result.ok) {
-        dispatch({ type: "DELETE", payload: { id: item.id } });
+        dispatch({ type: "SET_DELETING", payload: null });
+        dispatch({ type: "SET_DETAIL", payload: null });
+        router.refresh();
         feedback.showSuccess("Medya silindi.");
       } else {
         dispatch({ type: "SET_DELETING", payload: null });
@@ -246,7 +225,7 @@ export function useMediaManager({ initialItems, selectMode }: UseMediaManagerPro
         feedback.showError(result.error);
       }
     },
-    [feedback]
+    [feedback, router]
   );
 
   const handleEditSubmit = useCallback(
@@ -254,17 +233,15 @@ export function useMediaManager({ initialItems, selectMode }: UseMediaManagerPro
       dispatch({ type: "SET_EDIT_ERROR", payload: null });
       const result = await updateMedia(mediaId, formData);
       if (result.ok) {
-        const filename = (formData.get("filename") as string)?.trim() ?? "";
-        const alt = (formData.get("alt") as string)?.trim() || null;
-        dispatch({ type: "UPDATE", payload: { id: mediaId, filename, alt } });
         dispatch({ type: "SET_EDITING", payload: null });
+        router.refresh();
         feedback.showSuccess("Değişiklikler kaydedildi.");
       } else {
         dispatch({ type: "SET_EDIT_ERROR", payload: result.error });
         feedback.showError(result.error);
       }
     },
-    [feedback]
+    [feedback, router]
   );
 
   const toggleBulkSelect = useCallback((id: string) => {
@@ -289,11 +266,12 @@ export function useMediaManager({ initialItems, selectMode }: UseMediaManagerPro
       const result = await deleteMedia(id);
       if (result.ok) deleted++;
     }
-    dispatch({ type: "BULK_DELETE_DONE", payload: ids });
+    dispatch({ type: "BULK_DELETE_DONE", payload: undefined });
+    router.refresh();
     feedback.showSuccess(
       deleted === count ? `${deleted} öğe silindi.` : `${deleted}/${count} öğe silindi.`
     );
-  }, [state.selectedIds, feedback]);
+  }, [state.selectedIds, feedback, router]);
 
   const startBulkSelect = useCallback(() => {
     dispatch({ type: "BULK_SELECT_MODE", payload: true });
@@ -308,20 +286,24 @@ export function useMediaManager({ initialItems, selectMode }: UseMediaManagerPro
       dispatch({ type: "SET_RETRYING", payload: mediaId });
       const result = await retryMedia(mediaId);
       if (result.ok) {
-        dispatch({ type: "RETRY", payload: { id: mediaId } });
+        dispatch({ type: "SET_RETRYING", payload: null });
+        router.refresh();
         feedback.showSuccess("Yeniden işlendi.");
       } else {
         dispatch({ type: "SET_RETRYING", payload: null });
         feedback.showError(result.error);
       }
     },
-    [feedback]
+    [feedback, router]
   );
 
-  const listItems: ListItem[] = [
-    ...state.uploads.map((item) => ({ type: "upload" as const, item })),
-    ...state.items.map((item) => ({ type: "media" as const, item })),
-  ];
+  const listItems: ListItem[] = useMemo(
+    () => [
+      ...state.uploads.map((item) => ({ type: "upload" as const, item })),
+      ...items.map((item) => ({ type: "media" as const, item })),
+    ],
+    [state.uploads, items]
+  );
 
   return {
     state,
@@ -339,6 +321,7 @@ export function useMediaManager({ initialItems, selectMode }: UseMediaManagerPro
     cancelBulkSelect,
     handleRetry,
     setEditingId: (id: string | null) => dispatch({ type: "SET_EDITING", payload: id }),
+    setDetailId: (id: string | null) => dispatch({ type: "SET_DETAIL", payload: id }),
     setError: (err: string | null) => dispatch({ type: "SET_ERROR", payload: err }),
   };
 }
