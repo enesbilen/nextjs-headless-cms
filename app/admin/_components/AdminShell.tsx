@@ -6,8 +6,10 @@ import { Sidebar } from "./Sidebar";
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLogin = pathname === "/admin/login";
+  // Builder gets a full-screen layout (no sidebar)
+  const isBuilder = pathname.includes("/builder");
 
-  if (isLogin) {
+  if (isLogin || isBuilder) {
     return <>{children}</>;
   }
 

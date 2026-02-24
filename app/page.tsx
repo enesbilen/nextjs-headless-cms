@@ -41,6 +41,8 @@ export default async function HomePage() {
       id: true,
       title: true,
       body: true,
+      blocks: true,
+      builderMode: true,
       status: true,
       coverImageId: true,
       coverImage: {
@@ -58,6 +60,8 @@ export default async function HomePage() {
       title={page.title}
       body={page.body}
       coverImage={page.coverImage}
+      builderMode={page.builderMode}
+      blocks={page.blocks}
     />
   );
 }

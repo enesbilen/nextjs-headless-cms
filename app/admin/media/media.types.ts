@@ -5,12 +5,13 @@ export type MediaItem = {
   filename: string;
   mimeType: string | null;
   url: string;
+  thumbnailUrl?: string;
   width: number | null;
   height: number | null;
   alt: string | null;
   status: MediaStatus;
   version: number;
-  createdAt: string;
+  createdAt?: string;
 };
 
 export type MediaDTO = {

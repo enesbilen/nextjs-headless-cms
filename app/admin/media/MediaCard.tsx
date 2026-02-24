@@ -77,7 +77,7 @@ export function MediaCard({
               </div>
             ) : m.mimeType?.startsWith("image/") ? (
               <img
-                src={m.thumbnailUrl}
+                src={m.thumbnailUrl ?? m.url}
                 alt={m.alt ?? m.filename}
                 className="h-full w-full object-cover"
               />
@@ -131,7 +131,7 @@ export function MediaCard({
             </div>
           ) : m.mimeType?.startsWith("image/") ? (
             <img
-              src={m.thumbnailUrl}
+              src={m.thumbnailUrl ?? m.url}
               alt={m.alt ?? m.filename}
               className="h-full w-full object-cover"
             />

@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 
 import { createId } from "@paralleldrive/cuid2";
 import { createHash } from "crypto";
@@ -307,7 +307,11 @@ export async function createMediaFromUpload(file: File, userId: string): Promise
         }
         await db.mediaVariant.createMany({ data: variantData });
       } else {
-        const variants = await generateImageVariants(finalBuffer, baseStoragePath);
+        // Generate variants; catch AVIF/WEBP errors separately to allow graceful degradation
+        const variants = await generateImageVariants(finalBuffer, baseStoragePath).catch((variantErr) => {
+          console.error("[media] generateImageVariants failed:", variantErr);
+          throw variantErr;
+        });
         for (const v of variants) {
           await localStorage.write(v.storagePath, Readable.from(v.buffer));
           writtenPaths.push(v.storagePath);
@@ -343,6 +347,11 @@ export async function createMediaFromUpload(file: File, userId: string): Promise
       status: "ready",
     };
   } catch (e) {
+    console.error("[media] createMediaFromUpload FAILED:", {
+      filename: file.name,
+      error: e instanceof Error ? e.message : String(e),
+      stack: e instanceof Error ? e.stack : undefined,
+    });
     await deleteWrittenFiles(writtenPaths);
     await db.media.update({
       where: { id },

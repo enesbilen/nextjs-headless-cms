@@ -10,6 +10,13 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Builder dark-theme palette */
+  --color-builder-root: #1a1a2e;
+  --color-builder-panel: #16213e;
+  --color-builder-edge: #0f3460;
+  --color-builder-line: #1e4080;
+  --color-builder-active: #1e3a5f;
 }
 
 @media (prefers-color-scheme: dark) {

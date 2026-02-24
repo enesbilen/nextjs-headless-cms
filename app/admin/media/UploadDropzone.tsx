@@ -22,9 +22,13 @@ type Props = {
   inputRef: React.RefObject<HTMLInputElement | null>;
   onFiles: (files: File[]) => void;
   disabled: boolean;
+  /** Optional class for the dropzone container (e.g. dark theme). */
+  className?: string;
+  /** Optional class for the label (e.g. dark theme). */
+  labelClassName?: string;
 };
 
-export function UploadDropzone({ inputRef, onFiles, disabled }: Props) {
+export function UploadDropzone({ inputRef, onFiles, disabled, className = "", labelClassName = "" }: Props) {
   const handleChange = useCallback(
     (e: ChangeEvent) => {
       const files = extractFiles(e);
@@ -52,7 +56,7 @@ export function UploadDropzone({ inputRef, onFiles, disabled }: Props) {
     <div
       onDrop={handleDrop}
       onDragOver={handleDragOver}
-      className="rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center transition-colors"
+      className={`rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center transition-colors ${className}`.trim()}
       style={{
         opacity: disabled ? 0.7 : 1,
         pointerEvents: disabled ? "none" : "auto",
@@ -70,7 +74,7 @@ export function UploadDropzone({ inputRef, onFiles, disabled }: Props) {
       />
       <label
         htmlFor="media-upload"
-        className="cursor-pointer text-zinc-600 hover:text-zinc-900"
+        className={`cursor-pointer text-zinc-600 hover:text-zinc-900 ${labelClassName}`.trim()}
         onClick={(e) => disabled && e.preventDefault()}
       >
         {disabled

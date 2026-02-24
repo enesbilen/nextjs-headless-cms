@@ -56,11 +56,13 @@ type Props = {
   totalPages: number;
   currentPage: number;
   selectMode: boolean;
+  onSelect?: (url: string) => void;
 };
 
 export function MediaManager({
   initialItems,
   selectMode,
+  onSelect,
 }: Props) {
   const {
     state,
@@ -82,7 +84,7 @@ export function MediaManager({
     clearRejectedFiles,
     setEditingId,
     setDetailId,
-  } = useMediaManager({ items: initialItems, selectMode });
+  } = useMediaManager({ items: initialItems, selectMode, onSelect });
 
   const editingItem = state.editingId
     ? initialItems.find((i) => i.id === state.editingId)

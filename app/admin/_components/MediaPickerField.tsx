@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Dialog } from "@/core/ui/Dialog";
 import { MediaManager, type MediaItem } from "@/app/admin/media/MediaManager";
-import { getMediaList } from "@/app/admin/media/actions";
+import { getMediaList, type GetMediaListResult } from "@/app/admin/media/actions";
 import { DEFAULT_PER_PAGE } from "@/app/admin/media/mediaQuery";
 
 type MediaPickerFieldProps = {
@@ -28,7 +28,7 @@ type PickerContentProps = {
 };
 
 function MediaPickerDialogContent({ accept, onSelect }: PickerContentProps) {
-  const [items, setItems] = useState<(MediaItem & { thumbnailUrl?: string })[]>([]);
+  const [items, setItems] = useState<MediaItem[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,13 +44,13 @@ function MediaPickerDialogContent({ accept, onSelect }: PickerContentProps) {
       undefined,
       "desc"
     )
-      .then((res) => {
+      .then((res: GetMediaListResult) => {
         if (!cancelled) {
           setItems(res.items);
           setTotalPages(res.totalPages);
         }
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Yüklenemedi");
       })
       .finally(() => {

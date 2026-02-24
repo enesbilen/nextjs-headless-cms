@@ -3,6 +3,8 @@ model Page {
   slug           String   @unique
   title          String
   body           String   @db.LongText
+  blocks         Json?
+  builderMode    Boolean  @default(false)
   status         Status   @default(DRAFT)
   coverImageId   String?
   createdAt      DateTime @default(now())

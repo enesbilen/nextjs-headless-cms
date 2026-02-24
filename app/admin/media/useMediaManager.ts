@@ -93,9 +93,10 @@ function mediaReducer(state: MediaState, action: MediaAction): MediaState {
 export type UseMediaManagerProps = {
   items: MediaItem[];
   selectMode: boolean;
+  onSelect?: (url: string) => void;
 };
 
-export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
+export function useMediaManager({ items, selectMode, onSelect }: UseMediaManagerProps) {
   const feedback = useFeedback();
   const { requestRefresh } = useScheduledRefresh();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -272,14 +273,16 @@ export function useMediaManager({ items, selectMode }: UseMediaManagerProps) {
   const selectItem = useCallback(
     (url: string) => {
       if (!selectMode) return;
-      if (typeof window !== "undefined" && window.opener) {
+      if (onSelect) {
+        onSelect(url);
+      } else if (typeof window !== "undefined" && window.opener) {
         window.opener.postMessage({ type: "media-selected", url }, "*");
         window.close();
       } else {
         copyUrl(url, "");
       }
     },
-    [selectMode, copyUrl]
+    [selectMode, onSelect, copyUrl]
   );
 
   const handleDelete = useCallback(

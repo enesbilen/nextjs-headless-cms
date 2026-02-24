@@ -10,7 +10,7 @@ import {
   replaceMedia as replaceMediaService,
   retryProcessing as retryProcessingService,
 } from "@/core/media/media-service";
-import type { MediaDTO, FailedUpload } from "./media.types";
+import type { MediaDTO, MediaItem, FailedUpload } from "./media.types";
 
 /** Upload result: JSON-serializable only. No Date, no undefined in required fields. */
 export type UploadBatchResult = {
@@ -69,7 +69,6 @@ export async function uploadMedia(formData: FormData): Promise<UploadBatchResult
 
   if (uploaded.length > 0) {
     revalidatePath("/admin/media");
-    revalidatePath("/admin");
   }
 
   return { uploaded, failed };
@@ -127,6 +126,74 @@ export async function replaceMedia(mediaId: string, formData: FormData): Promise
 export type UpdateMediaResult =
   | { ok: true; filename: string }
   | { ok: false; error: string };
+
+export type GetMediaListResult = {
+  items: MediaItem[];
+  totalPages: number;
+};
+
+export async function getMediaList(
+  page: number,
+  perPage: number,
+  typeFilter?: string,
+  search?: string,
+  order: "asc" | "desc" = "desc",
+): Promise<GetMediaListResult> {
+  const session = await getSession();
+  if (!session.userId) return { items: [], totalPages: 0 };
+
+  const baseWhere: Record<string, unknown> = { status: { in: ["ready", "failed"] }, deletedAt: null };
+
+  if (typeFilter === "image") {
+    baseWhere.mimeType = { startsWith: "image/" };
+  }
+  if (search?.trim()) {
+    baseWhere.filename = { contains: search.trim() };
+  }
+
+  const skip = (Math.max(1, page) - 1) * perPage;
+
+  const [rows, total] = await Promise.all([
+    db.media.findMany({
+      where: baseWhere,
+      orderBy: { createdAt: order },
+      skip,
+      take: perPage,
+      select: {
+        id: true,
+        filename: true,
+        storagePath: true,
+        mimeType: true,
+        width: true,
+        height: true,
+        alt: true,
+        status: true,
+        version: true,
+        createdAt: true,
+      },
+    }),
+    db.media.count({ where: baseWhere }),
+  ]);
+
+  const items: MediaItem[] = rows.map((m) => {
+    const url = getMediaUrl(m.id, m, m.version ?? undefined);
+    return {
+      id: m.id,
+      filename: m.filename,
+      mimeType: m.mimeType,
+      width: m.width,
+      height: m.height,
+      alt: m.alt,
+      status: m.status === "ready" || m.status === "failed" ? m.status : "ready",
+      version: m.version,
+      url,
+      thumbnailUrl: url + (url.includes("?") ? "&" : "?") + "variant=thumbnail",
+      createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : undefined,
+    };
+  });
+
+  return { items, totalPages: Math.ceil(total / perPage) };
+}
 
 export async function updateMedia(
   mediaId: string,
