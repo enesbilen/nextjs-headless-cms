@@ -9,6 +9,16 @@
 .builder-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .builder-scrollbar::-webkit-scrollbar-thumb { background: #1e4080; border-radius: 4px; }
 
+/* Canvas scroll (koyu arka plan) — daha görünür */
+.builder-canvas-scroll::-webkit-scrollbar { width: 10px; }
+.builder-canvas-scroll::-webkit-scrollbar-track { background: #1e293b; border-radius: 10px; }
+.builder-canvas-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+.builder-canvas-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+.builder-canvas-scroll {
+  scrollbar-color: #475569 #1e293b;
+  scrollbar-width: thin;
+}
+
 /* ── Range slider (CSSValueInput) ──────────────── */
 .builder-slider {
   -webkit-appearance: none;

@@ -7,6 +7,7 @@ import type {
     BlockInstance,
     BlockType,
     BlockProps,
+    BlockVisibility,
     BuilderDevice,
     PageBuilderDoc,
     PageSettings,
@@ -78,6 +79,12 @@ export interface BuilderActions {
     copySelectedToClipboard: () => void;
     /** Paste clipboard into canvas (after selected block or into selected container). */
     pasteFromClipboard: () => void;
+    /** Insert template/section blocks at root (IDs are reassigned). */
+    insertBlocksAtRoot: (blocks: BlockInstance[]) => void;
+    /** Set block visibility (hide on desktop/tablet/mobile). */
+    updateBlockVisibility: (blockId: string, visibility: BlockVisibility | undefined) => void;
+    /** Columns blokunda sütun sayısını 2 veya 3 yap (tip, props, children güncellenir). */
+    setColumnsCount: (blockId: string, count: 2 | 3) => void;
 }
 
 export type BuilderStore = BuilderState & BuilderActions;
@@ -281,6 +288,44 @@ export const useBuilderStore = create<BuilderStore>()(
                 if (block) {
                     block.props = { ...block.props, ...props } as BlockProps;
                 }
+                s.isDirty = true;
+            });
+        },
+
+        updateBlockVisibility(blockId, visibility) {
+            set((s) => {
+                pushHistory(s);
+                const block = findBlock(s.blocks, blockId);
+                if (block) {
+                    block.visibility = visibility && (visibility.hideOnDesktop || visibility.hideOnTablet || visibility.hideOnMobile)
+                        ? visibility
+                        : undefined;
+                }
+                s.isDirty = true;
+            });
+        },
+
+        setColumnsCount(blockId, count) {
+            set((s) => {
+                const block = findBlock(s.blocks, blockId);
+                if (!block || (block.type !== "columns-2" && block.type !== "columns-3")) return;
+                const currentCols = block.type === "columns-2" ? 2 : 3;
+                if (currentCols === count) return;
+                pushHistory(s);
+                const newType = count === 2 ? "columns-2" : "columns-3";
+                block.type = newType;
+                const p = block.props as import("./types").ColumnsProps;
+                p.columns = count;
+                const widths = p.columnWidths ?? Array.from({ length: currentCols }, () => "1fr");
+                if (count === 3) {
+                    p.columnWidths = [...widths.slice(0, 2), widths[2] ?? "1fr"];
+                    if (!block.children) block.children = [[], [], []];
+                    else while (block.children.length < 3) block.children.push([]);
+                } else {
+                    p.columnWidths = widths.slice(0, 2);
+                    if (block.children && block.children.length > 2) block.children = block.children.slice(0, 2);
+                }
+                if (p.columnSettings && p.columnSettings.length > count) p.columnSettings = p.columnSettings.slice(0, count);
                 s.isDirty = true;
             });
         },
@@ -491,6 +536,17 @@ export const useBuilderStore = create<BuilderStore>()(
                     toPaste.forEach((b) => targetArr.push(b));
                 }
                 s.selectedId = toPaste[0]?.id ?? null;
+                s.isDirty = true;
+            });
+        },
+
+        insertBlocksAtRoot(blocks) {
+            if (!blocks || blocks.length === 0) return;
+            const toInsert = cloneBlocksWithNewIds(blocks);
+            set((s) => {
+                pushHistory(s);
+                toInsert.forEach((b) => s.blocks.push(b));
+                s.selectedId = toInsert[0]?.id ?? null;
                 s.isDirty = true;
             });
         },

@@ -5,12 +5,19 @@ import type { PageBuilderDoc } from "@/core/page-builder/types";
 
 export const dynamic = "force-dynamic";
 
+/** Builder sayfası her zaman istek anında render edilsin (statik 404 üretilmesin). */
+export function generateStaticParams() {
+    return [];
+}
+
 export default async function BuilderPage({
     params,
 }: {
     params: Promise<{ id: string }>;
 }) {
-    const { id } = await params;
+    const resolved = await params;
+    const id = resolved?.id;
+    if (!id || typeof id !== "string") notFound();
 
     const page = await db.page.findUnique({
         where: { id },

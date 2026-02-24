@@ -1,0 +1,12 @@
+model PageRevision {
+  id        String   @id @default(cuid())
+  pageId    String
+  doc       Json     // PageBuilderDoc: { version: 1, blocks, pageSettings? }
+  label     String?  // optional label e.g. "Taslak kaydet — 24 Şub 2026 12:00"
+  createdAt DateTime @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+  @@index([pageId, createdAt])
+}

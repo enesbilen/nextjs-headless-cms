@@ -114,7 +114,7 @@ export function PageBuilderClient({
             <div className="flex flex-1 overflow-hidden">
                 <ElementsPanel />
                 <BuilderCanvas />
-                <PropertiesPanel />
+                <PropertiesPanel pageId={pageId} />
             </div>
         </div>
     );

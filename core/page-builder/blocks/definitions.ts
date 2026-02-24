@@ -212,6 +212,49 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
             html: "<!-- HTML kodunuzu buraya yazın -->",
         },
     },
+    {
+        type: "tabs",
+        label: "Sekmeler",
+        icon: "▤",
+        category: "advanced",
+        description: "Sekmeli içerik",
+        defaultProps: {
+            tabs: [
+                { label: "Sekme 1", content: "İlk sekme içeriği." },
+                { label: "Sekme 2", content: "İkinci sekme içeriği." },
+            ],
+            defaultTabIndex: 0,
+        },
+    },
+    {
+        type: "accordion",
+        label: "Akordeon",
+        icon: "▾",
+        category: "advanced",
+        description: "Açılır/kapanır öğeler",
+        defaultProps: {
+            items: [
+                { title: "Başlık 1", content: "İçerik 1.", open: true },
+                { title: "Başlık 2", content: "İçerik 2." },
+            ],
+        },
+    },
+    {
+        type: "icon-box",
+        label: "İkon Kutusu",
+        icon: "◇",
+        category: "advanced",
+        description: "İkon + başlık + metin",
+        defaultProps: {
+            icon: "★",
+            title: "Başlık",
+            text: "Kısa açıklama metni.",
+            align: "left",
+            iconColor: "#2563eb",
+            titleColor: "#111827",
+            textColor: "#4b5563",
+        },
+    },
 ];
 
 // ---------------------------------------------------------------------------

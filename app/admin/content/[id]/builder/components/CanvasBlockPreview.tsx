@@ -179,6 +179,33 @@ function LeafBlockPreview({ block }: { block: BlockInstance }) {
                     {p.html}
                 </div>
             );
+        case "tabs":
+            return (
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+                    <div style={{ display: "flex", gap: 4, padding: "8px 8px 0", background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                        {(p.tabs ?? []).slice(0, 3).map((t: { label: string }, i: number) => (
+                            <span key={i} style={{ padding: "6px 10px", fontSize: "0.75rem", fontWeight: 500, color: "#374151" }}>{t.label}</span>
+                        ))}
+                    </div>
+                    <div style={{ padding: 12, fontSize: "0.8rem", color: "#6b7280" }}>{(p.tabs ?? [])[0]?.content || "Sekme içeriği"}</div>
+                </div>
+            );
+        case "accordion":
+            return (
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+                    {(p.items ?? []).slice(0, 2).map((item: { title: string }, i: number) => (
+                        <div key={i} style={{ padding: "8px 12px", borderBottom: i < 1 ? "1px solid #e5e7eb" : undefined, fontWeight: 600, fontSize: "0.8rem" }}>{item.title}</div>
+                    ))}
+                </div>
+            );
+        case "icon-box":
+            return (
+                <div style={{ padding: 12, textAlign: (p.align ?? "left") as "left" | "center" | "right" }}>
+                    <span style={{ fontSize: "1.5rem", color: p.iconColor ?? "#2563eb" }}>{p.icon || "◇"}</span>
+                    <div style={{ fontWeight: 700, marginTop: 4, color: p.titleColor }}>{p.title}</div>
+                    <div style={{ fontSize: "0.8rem", color: p.textColor ?? "#6b7280", marginTop: 2 }}>{p.text}</div>
+                </div>
+            );
         default:
             return (
                 <div style={{ background: "#f9fafb", padding: "0.75rem", borderRadius: 4, textAlign: "center", color: "#6b7280" }}>

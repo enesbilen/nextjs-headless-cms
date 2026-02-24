@@ -10,6 +10,7 @@
     "seed": "tsx prisma/seed.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:reset": "prisma migrate reset",
     "media:gc": "tsx scripts/media-gc.ts"
   },
   "prisma": {

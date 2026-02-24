@@ -11,7 +11,8 @@ model Page {
   updatedAt      DateTime @updatedAt
   deletedAt      DateTime?
 
-  coverImage Media? @relation("PageCoverImage", fields: [coverImageId], references: [id], onDelete: SetNull)
+  coverImage Media?         @relation("PageCoverImage", fields: [coverImageId], references: [id], onDelete: SetNull)
+  revisions PageRevision[]
 
   @@index([status])
   @@index([slug])

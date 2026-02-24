@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MediaPickerModal } from "./MediaPickerModal";
 import { CSSValueInput, SpacingControl, BorderRadiusControl } from "./CSSValueInput";
 import type { SpacingValue } from "./CSSValueInput";
 import { useBuilderStore } from "@/core/page-builder/store";
+import { getPageRevisions, loadRevision, type PageRevisionItem } from "../actions";
 import type {
     BlockInstance,
+    BlockVisibility,
     HeadingProps,
     TextProps,
     ImageProps,
@@ -20,10 +22,17 @@ import type {
     CardProps,
     HtmlProps,
     VideoProps,
+    TabsProps,
+    AccordionProps,
+    IconBoxProps,
+    TabItem,
+    AccordionItem,
     AlignValue,
     PageSettings,
     PageLayoutPreset,
+    BuilderDevice,
 } from "@/core/page-builder/types";
+import { getValueForDevice } from "@/core/page-builder/responsiveStyles";
 import { getBlockDefinition } from "@/core/page-builder/blocks/definitions";
 
 // ---------------------------------------------------------------------------
@@ -52,6 +61,16 @@ function SectionDivider({ label }: { label: string }) {
             <div className="flex-1 h-px bg-builder-edge" />
             <span className="text-slate-600 whitespace-nowrap">{label}</span>
             <div className="flex-1 h-px bg-builder-edge" />
+        </div>
+    );
+}
+
+/** Küçük cihaz göstergesi: "Bu alanlar için cihaz: Masaüstü / Tablet / Mobil" */
+function DeviceHint({ device }: { device: BuilderDevice }) {
+    const labels: Record<BuilderDevice, string> = { desktop: "Masaüstü", tablet: "Tablet", mobile: "Mobil" };
+    return (
+        <div className="text-[0.65rem] uppercase tracking-wider text-slate-500 mb-1.5">
+            Cihaz: <span className="text-slate-400 font-semibold">{labels[device]}</span>
         </div>
     );
 }
@@ -221,10 +240,32 @@ function PaddingGroup({ top, right, bottom, left, onChange }: {
 // PAGE SETTINGS EDITOR
 // ---------------------------------------------------------------------------
 
-export function PageSettingsEditor() {
-    const { pageSettings, updatePageSettings } = useBuilderStore();
+export function PageSettingsEditor({ pageId }: { pageId: string }) {
+    const { pageSettings, updatePageSettings, loadBlocks } = useBuilderStore();
     const upd = (patch: Partial<PageSettings>) => updatePageSettings(patch);
-    const [tab, setTab] = useState<"layout" | "style">("layout");
+    const [tab, setTab] = useState<"layout" | "style" | "revizyonlar">("layout");
+    const [revisions, setRevisions] = useState<PageRevisionItem[]>([]);
+    const [revisionsLoading, setRevisionsLoading] = useState(false);
+    const [restoringId, setRestoringId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (tab === "revizyonlar" && pageId) {
+            setRevisionsLoading(true);
+            getPageRevisions(pageId)
+                .then(setRevisions)
+                .finally(() => setRevisionsLoading(false));
+        }
+    }, [tab, pageId]);
+
+    const handleRestoreRevision = async (revisionId: string) => {
+        setRestoringId(revisionId);
+        try {
+            const doc = await loadRevision(pageId, revisionId);
+            if (doc) loadBlocks(doc);
+        } finally {
+            setRestoringId(null);
+        }
+    };
 
     return (
         <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2.5 builder-scrollbar">
@@ -244,6 +285,14 @@ export function PageSettingsEditor() {
                     onClick={() => setTab("style")}
                 >
                     Stil
+                </button>
+                <button
+                    className={`flex-1 py-[5px] px-2 rounded-md border-none cursor-pointer text-[0.72rem] font-semibold transition-all whitespace-nowrap ${
+                        tab === "revizyonlar" ? "bg-builder-active text-blue-400" : "bg-transparent text-slate-500 hover:text-slate-200"
+                    }`}
+                    onClick={() => setTab("revizyonlar")}
+                >
+                    Revizyonlar
                 </button>
             </div>
 
@@ -325,6 +374,48 @@ export function PageSettingsEditor() {
                     </FieldRow>
                 </>
             )}
+
+            {tab === "revizyonlar" && (
+                <>
+                    <SectionDivider label="Revizyonlar" />
+                    <p className="text-[0.7rem] text-slate-500 mb-2">
+                        Son kayıtlar. Bu sürüme döndükten sonra Taslak olarak kaydet veya Yayınla ile uygulayın.
+                    </p>
+                    {revisionsLoading ? (
+                        <p className="text-[0.8rem] text-slate-400">Yükleniyor…</p>
+                    ) : revisions.length === 0 ? (
+                        <p className="text-[0.8rem] text-slate-500">Henüz revizyon yok.</p>
+                    ) : (
+                        <ul className="flex flex-col gap-2">
+                            {revisions.map((r) => (
+                                <li
+                                    key={r.id}
+                                    className="flex flex-col gap-1.5 p-2 rounded-lg border border-builder-line bg-slate-900/50"
+                                >
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[0.75rem] text-slate-300 truncate">
+                                            {r.label ?? "Revizyon"}
+                                        </span>
+                                        <span className="text-[0.65rem] text-slate-500 shrink-0">
+                                            {typeof r.createdAt === "string"
+                                                ? new Date(r.createdAt).toLocaleString("tr-TR")
+                                                : r.createdAt.toLocaleString("tr-TR")}
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRestoreRevision(r.id)}
+                                        disabled={restoringId === r.id}
+                                        className="w-full py-1.5 px-2 rounded border border-builder-line bg-slate-800 text-slate-300 text-[0.72rem] font-medium cursor-pointer transition-all hover:bg-blue-500/20 hover:border-blue-500 hover:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {restoringId === r.id ? "Yükleniyor…" : "Bu sürüme dön"}
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </>
+            )}
         </div>
     );
 }
@@ -334,20 +425,38 @@ export function PageSettingsEditor() {
 // ---------------------------------------------------------------------------
 
 function HeadingEditor({ block }: { block: BlockInstance }) {
-    const { updateBlock } = useBuilderStore();
+    const { updateBlock, device } = useBuilderStore();
     const p = block.props as HeadingProps;
+    const r = p.responsive;
+
+    const align = getValueForDevice(p.align, r?.tablet?.align, r?.mobile?.align, device);
+    const color = getValueForDevice(p.color, r?.tablet?.color, r?.mobile?.color, device);
+    const fontSize = getValueForDevice(p.fontSize ?? "", r?.tablet?.fontSize, r?.mobile?.fontSize, device);
+
     const upd = (patch: Partial<HeadingProps>) => updateBlock(block.id, patch);
+    const updResponsive = (key: "align" | "color" | "fontSize", value: AlignValue | string) => {
+        if (device === "desktop") {
+            upd({ [key]: value });
+            return;
+        }
+        const next = {
+            ...p.responsive,
+            [device]: { ...p.responsive?.[device], [key]: value },
+        };
+        upd({ responsive: next });
+    };
 
     return (
         <>
+            <DeviceHint device={device} />
             <FieldRow label="Metin"><TextInput value={p.text} onChange={(v) => upd({ text: v })} multiline /></FieldRow>
             <FieldRow label="Seviye">
                 <SelectInput value={String(p.level)} onChange={(v) => upd({ level: Number(v) as HeadingProps["level"] })}
                     options={[1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: `H${n}` }))}
                 />
             </FieldRow>
-            <FieldRow label="Hizalama"><AlignButtons value={p.align} onChange={(v) => upd({ align: v })} /></FieldRow>
-            <FieldRow label="Renk"><ColorInput value={p.color} onChange={(v) => upd({ color: v })} /></FieldRow>
+            <FieldRow label="Hizalama"><AlignButtons value={align} onChange={(v) => updResponsive("align", v)} /></FieldRow>
+            <FieldRow label="Renk"><ColorInput value={color} onChange={(v) => updResponsive("color", v)} /></FieldRow>
             <FieldRow label="Font ağırlığı">
                 <SelectInput value={p.fontWeight ?? "bold"} onChange={(v) => upd({ fontWeight: v })}
                     options={[
@@ -358,22 +467,32 @@ function HeadingEditor({ block }: { block: BlockInstance }) {
                     ]}
                 />
             </FieldRow>
-            <FieldRow label="Font boyutu"><TextInput value={p.fontSize ?? ""} onChange={(v) => upd({ fontSize: v })} placeholder="2rem" /></FieldRow>
+            <FieldRow label="Font boyutu"><TextInput value={fontSize} onChange={(v) => updResponsive("fontSize", v)} placeholder="2rem" /></FieldRow>
         </>
     );
 }
 
 function TextEditor({ block }: { block: BlockInstance }) {
-    const { updateBlock } = useBuilderStore();
+    const { updateBlock, device } = useBuilderStore();
     const p = block.props as TextProps;
+    const r = p.responsive;
+    const align = getValueForDevice(p.align, r?.tablet?.align, r?.mobile?.align, device);
+    const color = getValueForDevice(p.color, r?.tablet?.color, r?.mobile?.color, device);
+    const fontSize = getValueForDevice(p.fontSize ?? "1rem", r?.tablet?.fontSize, r?.mobile?.fontSize, device);
+
     const upd = (patch: Partial<TextProps>) => updateBlock(block.id, patch);
+    const updResponsive = (key: "align" | "color" | "fontSize", value: AlignValue | string) => {
+        if (device === "desktop") { upd({ [key]: value }); return; }
+        upd({ responsive: { ...p.responsive, [device]: { ...p.responsive?.[device], [key]: value } } });
+    };
 
     return (
         <>
+            <DeviceHint device={device} />
             <FieldRow label="İçerik"><TextInput value={p.text} onChange={(v) => upd({ text: v })} multiline /></FieldRow>
-            <FieldRow label="Hizalama"><AlignButtons value={p.align} onChange={(v) => upd({ align: v })} /></FieldRow>
-            <FieldRow label="Renk"><ColorInput value={p.color} onChange={(v) => upd({ color: v })} /></FieldRow>
-            <FieldRow label="Font boyutu"><TextInput value={p.fontSize ?? "1rem"} onChange={(v) => upd({ fontSize: v })} placeholder="1rem" /></FieldRow>
+            <FieldRow label="Hizalama"><AlignButtons value={align} onChange={(v) => updResponsive("align", v)} /></FieldRow>
+            <FieldRow label="Renk"><ColorInput value={color} onChange={(v) => updResponsive("color", v)} /></FieldRow>
+            <FieldRow label="Font boyutu"><TextInput value={fontSize} onChange={(v) => updResponsive("fontSize", v)} placeholder="1rem" /></FieldRow>
         </>
     );
 }
@@ -439,12 +558,20 @@ function ImageEditor({ block }: { block: BlockInstance }) {
 }
 
 function ButtonEditor({ block }: { block: BlockInstance }) {
-    const { updateBlock } = useBuilderStore();
+    const { updateBlock, device } = useBuilderStore();
     const p = block.props as ButtonProps;
+    const r = p.responsive;
+    const align = getValueForDevice(p.align, r?.tablet?.align, r?.mobile?.align, device);
+
     const upd = (patch: Partial<ButtonProps>) => updateBlock(block.id, patch);
+    const updResponsive = (key: "align", value: AlignValue) => {
+        if (device === "desktop") { upd({ align: value }); return; }
+        upd({ responsive: { ...p.responsive, [device]: { ...p.responsive?.[device], [key]: value } } });
+    };
 
     return (
         <>
+            <DeviceHint device={device} />
             <FieldRow label="Etiket"><TextInput value={p.label} onChange={(v) => upd({ label: v })} /></FieldRow>
             <FieldRow label="Link (href)"><TextInput value={p.href} onChange={(v) => upd({ href: v })} placeholder="https://..." /></FieldRow>
             <FieldRow label="Varyant">
@@ -462,7 +589,7 @@ function ButtonEditor({ block }: { block: BlockInstance }) {
                     options={[{ value: "sm", label: "Küçük" }, { value: "md", label: "Orta" }, { value: "lg", label: "Büyük" }]}
                 />
             </FieldRow>
-            <FieldRow label="Hizalama"><AlignButtons value={p.align} onChange={(v) => upd({ align: v })} /></FieldRow>
+            <FieldRow label="Hizalama"><AlignButtons value={align} onChange={(v) => updResponsive("align", v)} /></FieldRow>
             <FieldRow label="Arkaplan"><ColorInput value={p.backgroundColor ?? "#2563eb"} onChange={(v) => upd({ backgroundColor: v })} /></FieldRow>
             <FieldRow label="Metin rengi"><ColorInput value={p.textColor ?? "#ffffff"} onChange={(v) => upd({ textColor: v })} /></FieldRow>
             <FieldRow label="Border radius"><TextInput value={p.borderRadius ?? "0.5rem"} onChange={(v) => upd({ borderRadius: v })} /></FieldRow>
@@ -472,12 +599,21 @@ function ButtonEditor({ block }: { block: BlockInstance }) {
 }
 
 function DividerEditor({ block }: { block: BlockInstance }) {
-    const { updateBlock } = useBuilderStore();
+    const { updateBlock, device } = useBuilderStore();
     const p = block.props as DividerProps;
+    const r = p.responsive;
+    const marginTop = getValueForDevice(p.marginTop, r?.tablet?.marginTop, r?.mobile?.marginTop, device);
+    const marginBottom = getValueForDevice(p.marginBottom, r?.tablet?.marginBottom, r?.mobile?.marginBottom, device);
+
     const upd = (patch: Partial<DividerProps>) => updateBlock(block.id, patch);
+    const updResponsive = (key: "marginTop" | "marginBottom", value: number) => {
+        if (device === "desktop") { upd({ [key]: value }); return; }
+        upd({ responsive: { ...p.responsive, [device]: { ...p.responsive?.[device], [key]: value } } });
+    };
 
     return (
         <>
+            <DeviceHint device={device} />
             <FieldRow label="Renk"><ColorInput value={p.color} onChange={(v) => upd({ color: v })} /></FieldRow>
             <FieldRow label="Kalınlık">
                 <CSSValueInput value={`${p.thickness}px`} onChange={(v) => upd({ thickness: parseFloat(v) || 1 })} units={["px"]} sliderMax={20} min={1} />
@@ -488,22 +624,34 @@ function DividerEditor({ block }: { block: BlockInstance }) {
                 />
             </FieldRow>
             <FieldRow label="Üst boşluk">
-                <CSSValueInput value={`${p.marginTop}px`} onChange={(v) => upd({ marginTop: parseFloat(v) || 0 })} units={["px", "rem"]} sliderMax={120} />
+                <CSSValueInput value={`${marginTop}px`} onChange={(v) => updResponsive("marginTop", parseFloat(v) || 0)} units={["px", "rem"]} sliderMax={120} />
             </FieldRow>
             <FieldRow label="Alt boşluk">
-                <CSSValueInput value={`${p.marginBottom}px`} onChange={(v) => upd({ marginBottom: parseFloat(v) || 0 })} units={["px", "rem"]} sliderMax={120} />
+                <CSSValueInput value={`${marginBottom}px`} onChange={(v) => updResponsive("marginBottom", parseFloat(v) || 0)} units={["px", "rem"]} sliderMax={120} />
             </FieldRow>
         </>
     );
 }
 
 function SpacerEditor({ block }: { block: BlockInstance }) {
-    const { updateBlock } = useBuilderStore();
+    const { updateBlock, device } = useBuilderStore();
     const p = block.props as SpacerProps;
+    const r = p.responsive;
+    const height = getValueForDevice(p.height, r?.tablet?.height, r?.mobile?.height, device);
+
+    const upd = (patch: Partial<SpacerProps>) => updateBlock(block.id, patch);
+    const updResponsive = (value: number) => {
+        if (device === "desktop") { upd({ height: value }); return; }
+        upd({ responsive: { ...p.responsive, [device]: { ...p.responsive?.[device], height: value } } });
+    };
+
     return (
-        <FieldRow label="Yükseklik">
-            <CSSValueInput value={`${p.height}px`} onChange={(v) => updateBlock(block.id, { height: parseFloat(v) || 0 } as Partial<SpacerProps>)} units={["px", "rem"]} sliderMax={600} min={0} />
-        </FieldRow>
+        <>
+            <DeviceHint device={device} />
+            <FieldRow label="Yükseklik">
+                <CSSValueInput value={`${height}px`} onChange={(v) => updResponsive(parseFloat(v) || 0)} units={["px", "rem"]} sliderMax={600} min={0} />
+            </FieldRow>
+        </>
     );
 }
 
@@ -511,13 +659,25 @@ function SpacerEditor({ block }: { block: BlockInstance }) {
 // SECTION EDITOR
 // ---------------------------------------------------------------------------
 function SectionEditor({ block }: { block: BlockInstance }) {
-    const { updateBlock } = useBuilderStore();
+    const { updateBlock, device } = useBuilderStore();
     const p = block.props as SectionProps;
+    const r = p.responsive;
+    const paddingTop = getValueForDevice(p.paddingTop, r?.tablet?.paddingTop, r?.mobile?.paddingTop, device);
+    const paddingBottom = getValueForDevice(p.paddingBottom, r?.tablet?.paddingBottom, r?.mobile?.paddingBottom, device);
+    const paddingLeft = getValueForDevice(p.paddingLeft, r?.tablet?.paddingLeft, r?.mobile?.paddingLeft, device);
+    const paddingRight = getValueForDevice(p.paddingRight, r?.tablet?.paddingRight, r?.mobile?.paddingRight, device);
+
     const upd = (patch: Partial<SectionProps>) => updateBlock(block.id, patch);
+    const updResponsive = (key: "paddingTop" | "paddingBottom" | "paddingLeft" | "paddingRight", value: number) => {
+        if (device === "desktop") { upd({ [key]: value }); return; }
+        upd({ responsive: { ...p.responsive, [device]: { ...p.responsive?.[device], [key]: value } } });
+    };
+
     const [tab, setTab] = useState<"layout" | "style">("layout");
 
     return (
         <>
+            <DeviceHint device={device} />
             <div className="flex gap-0.5 p-1 bg-slate-900 rounded-lg mb-1">
                 <button className={`flex-1 py-[5px] px-2 rounded-md border-none cursor-pointer text-[0.72rem] font-semibold transition-all whitespace-nowrap ${tab === "layout" ? "bg-builder-active text-blue-400" : "bg-transparent text-slate-500 hover:text-slate-200"}`} onClick={() => setTab("layout")}>Düzen</button>
                 <button className={`flex-1 py-[5px] px-2 rounded-md border-none cursor-pointer text-[0.72rem] font-semibold transition-all whitespace-nowrap ${tab === "style" ? "bg-builder-active text-blue-400" : "bg-transparent text-slate-500 hover:text-slate-200"}`} onClick={() => setTab("style")}>Stil</button>
@@ -559,12 +719,15 @@ function SectionEditor({ block }: { block: BlockInstance }) {
                     <FieldRow label="Padding">
                         <SpacingControl
                             value={{
-                                top: `${p.paddingTop}px`,
-                                right: `${p.paddingRight}px`,
-                                bottom: `${p.paddingBottom}px`,
-                                left: `${p.paddingLeft}px`,
+                                top: `${paddingTop}px`,
+                                right: `${paddingRight}px`,
+                                bottom: `${paddingBottom}px`,
+                                left: `${paddingLeft}px`,
                             }}
-                            onChange={(side, v) => upd({ [`padding${side.charAt(0).toUpperCase() + side.slice(1)}`]: parseFloat(v) || 0 })}
+                            onChange={(side, v) => {
+                                const key = `padding${side.charAt(0).toUpperCase() + side.slice(1)}` as "paddingTop" | "paddingRight" | "paddingBottom" | "paddingLeft";
+                                updResponsive(key, parseFloat(v) || 0);
+                            }}
                         />
                     </FieldRow>
                     <FieldRow label="Gap (sütun arası)">
@@ -588,10 +751,11 @@ function SectionEditor({ block }: { block: BlockInstance }) {
 // COLUMNS EDITOR
 // ---------------------------------------------------------------------------
 function ColumnsEditor({ block }: { block: BlockInstance }) {
-    const { updateBlock } = useBuilderStore();
+    const { updateBlock, setColumnsCount } = useBuilderStore();
     const p = block.props as ColumnsProps;
     const upd = (patch: Partial<ColumnsProps>) => updateBlock(block.id, patch);
     const [tab, setTab] = useState<"layout" | "columns" | "style">("layout");
+    const colCount = block.type === "columns-3" ? 3 : 2;
 
     const updColumn = (colIdx: number, patch: Partial<ColumnSettings>) => {
         const current = p.columnSettings ? [...p.columnSettings] : Array.from({ length: p.columns }, () => ({}));
@@ -609,6 +773,17 @@ function ColumnsEditor({ block }: { block: BlockInstance }) {
 
             {tab === "layout" && (
                 <>
+                    <SectionDivider label="Sütun sayısı" />
+                    <FieldRow label="Sütunlar">
+                        <SelectInput
+                            value={String(colCount)}
+                            onChange={(v) => setColumnsCount(block.id, v === "3" ? 3 : 2)}
+                            options={[
+                                { value: "2", label: "2 sütun" },
+                                { value: "3", label: "3 sütun" },
+                            ]}
+                        />
+                    </FieldRow>
                     <SectionDivider label="Izgara Ayarları" />
                     <FieldRow label="Sütun aralığı (gap)">
                         <CSSValueInput value={`${p.gap}px`} onChange={(v) => upd({ gap: parseFloat(v) || 0 })} units={["px", "rem"]} sliderMax={80} />
@@ -695,19 +870,27 @@ function ColumnsEditor({ block }: { block: BlockInstance }) {
 }
 
 function HeroEditor({ block }: { block: BlockInstance }) {
-    const { updateBlock } = useBuilderStore();
+    const { updateBlock, device } = useBuilderStore();
     const p = block.props as HeroProps;
+    const r = p.responsive;
+    const align = getValueForDevice(p.align, r?.tablet?.align, r?.mobile?.align, device);
+
     const upd = (patch: Partial<HeroProps>) => updateBlock(block.id, patch);
+    const updResponsive = (value: AlignValue) => {
+        if (device === "desktop") { upd({ align: value }); return; }
+        upd({ responsive: { ...p.responsive, [device]: { ...p.responsive?.[device], align: value } } });
+    };
 
     return (
         <>
+            <DeviceHint device={device} />
             <FieldRow label="Başlık"><TextInput value={p.heading} onChange={(v) => upd({ heading: v })} multiline /></FieldRow>
             <FieldRow label="Alt başlık"><TextInput value={p.subheading} onChange={(v) => upd({ subheading: v })} multiline /></FieldRow>
             <FieldRow label="Buton etiketi"><TextInput value={p.buttonLabel} onChange={(v) => upd({ buttonLabel: v })} /></FieldRow>
             <FieldRow label="Buton linki"><TextInput value={p.buttonHref} onChange={(v) => upd({ buttonHref: v })} /></FieldRow>
             <FieldRow label="Arkaplan rengi"><ColorInput value={p.backgroundColor} onChange={(v) => upd({ backgroundColor: v })} /></FieldRow>
             <FieldRow label="Metin rengi"><ColorInput value={p.textColor} onChange={(v) => upd({ textColor: v })} /></FieldRow>
-            <FieldRow label="Hizalama"><AlignButtons value={p.align} onChange={(v) => upd({ align: v })} /></FieldRow>
+            <FieldRow label="Hizalama"><AlignButtons value={align} onChange={(v) => updResponsive(v)} /></FieldRow>
             <FieldRow label="Yükseklik"><TextInput value={p.height ?? "500px"} onChange={(v) => upd({ height: v })} placeholder="500px" /></FieldRow>
             <BackgroundImageField value={p.backgroundImage ?? ""} onChange={(v) => upd({ backgroundImage: v })} />
             <FieldRow label="Overlay opaklık"><CSSValueInput value={`${Math.round((p.overlayOpacity ?? 0.5) * 100)}%`} onChange={(v) => upd({ overlayOpacity: (parseFloat(v) || 0) / 100 })} units={["%"]} sliderMax={100} min={0} /></FieldRow>
@@ -772,6 +955,88 @@ function VideoEditor({ block }: { block: BlockInstance }) {
     );
 }
 
+function TabsEditor({ block }: { block: BlockInstance }) {
+    const { updateBlock } = useBuilderStore();
+    const p = block.props as TabsProps;
+    const tabs = p.tabs ?? [];
+    const upd = (patch: Partial<TabsProps>) => updateBlock(block.id, patch);
+    const setTab = (index: number, item: Partial<TabItem>) => {
+        const next = [...tabs];
+        next[index] = { ...next[index], ...item };
+        upd({ tabs: next });
+    };
+    const addTab = () => upd({ tabs: [...tabs, { label: "Yeni sekme", content: "" }] });
+    const removeTab = (index: number) => upd({ tabs: tabs.filter((_, i) => i !== index) });
+
+    return (
+        <>
+            <SectionDivider label="Sekmeler" />
+            {tabs.map((tab, i) => (
+                <div key={i} className="rounded-lg border border-builder-line bg-slate-900/50 p-2 mb-2">
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-[0.7rem] text-slate-500">Sekme {i + 1}</span>
+                        <button type="button" onClick={() => removeTab(i)} className="text-red-400 hover:text-red-300 text-[0.7rem]">Sil</button>
+                    </div>
+                    <FieldRow label="Etiket"><TextInput value={tab.label} onChange={(v) => setTab(i, { label: v })} /></FieldRow>
+                    <FieldRow label="İçerik"><TextInput value={tab.content} onChange={(v) => setTab(i, { content: v })} multiline /></FieldRow>
+                </div>
+            ))}
+            <button type="button" onClick={addTab} className="py-1.5 px-2 rounded border border-builder-line bg-slate-800 text-slate-300 text-[0.72rem] cursor-pointer hover:bg-builder-line">+ Sekme ekle</button>
+            <FieldRow label="Varsayılan sekme"><TextInput value={String(p.defaultTabIndex ?? 0)} onChange={(v) => upd({ defaultTabIndex: Math.max(0, parseInt(v, 10) || 0) })} placeholder="0" /></FieldRow>
+        </>
+    );
+}
+
+function AccordionEditor({ block }: { block: BlockInstance }) {
+    const { updateBlock } = useBuilderStore();
+    const p = block.props as AccordionProps;
+    const items = p.items ?? [];
+    const upd = (patch: Partial<AccordionProps>) => updateBlock(block.id, patch);
+    const setItem = (index: number, item: Partial<AccordionItem>) => {
+        const next = [...items];
+        next[index] = { ...next[index], ...item };
+        upd({ items: next });
+    };
+    const addItem = () => upd({ items: [...items, { title: "Başlık", content: "" }] });
+    const removeItem = (index: number) => upd({ items: items.filter((_, i) => i !== index) });
+
+    return (
+        <>
+            <SectionDivider label="Öğeler" />
+            {items.map((item, i) => (
+                <div key={i} className="rounded-lg border border-builder-line bg-slate-900/50 p-2 mb-2">
+                    <div className="flex justify-between gap-1 mb-1">
+                        <span className="text-[0.7rem] text-slate-500">Öğe {i + 1}</span>
+                        <button type="button" onClick={() => removeItem(i)} className="text-red-400 hover:text-red-300 text-[0.7rem]">Sil</button>
+                    </div>
+                    <FieldRow label="Başlık"><TextInput value={item.title} onChange={(v) => setItem(i, { title: v })} /></FieldRow>
+                    <FieldRow label="İçerik"><TextInput value={item.content} onChange={(v) => setItem(i, { content: v })} multiline /></FieldRow>
+                    <FieldRow label="Varsayılan açık"><ToggleInput value={!!item.open} onChange={(v) => setItem(i, { open: v })} /></FieldRow>
+                </div>
+            ))}
+            <button type="button" onClick={addItem} className="py-1.5 px-2 rounded border border-builder-line bg-slate-800 text-slate-300 text-[0.72rem] cursor-pointer hover:bg-builder-line">+ Öğe ekle</button>
+        </>
+    );
+}
+
+function IconBoxEditor({ block }: { block: BlockInstance }) {
+    const { updateBlock } = useBuilderStore();
+    const p = block.props as IconBoxProps;
+    const upd = (patch: Partial<IconBoxProps>) => updateBlock(block.id, patch);
+
+    return (
+        <>
+            <FieldRow label="İkon"><TextInput value={p.icon} onChange={(v) => upd({ icon: v })} placeholder="★ veya emoji" /></FieldRow>
+            <FieldRow label="Başlık"><TextInput value={p.title} onChange={(v) => upd({ title: v })} /></FieldRow>
+            <FieldRow label="Metin"><TextInput value={p.text} onChange={(v) => upd({ text: v })} multiline /></FieldRow>
+            <FieldRow label="Hizalama"><AlignButtons value={p.align} onChange={(v) => upd({ align: v })} /></FieldRow>
+            <FieldRow label="İkon rengi"><ColorInput value={p.iconColor ?? "#2563eb"} onChange={(v) => upd({ iconColor: v })} /></FieldRow>
+            <FieldRow label="Başlık rengi"><ColorInput value={p.titleColor ?? "#111827"} onChange={(v) => upd({ titleColor: v })} /></FieldRow>
+            <FieldRow label="Metin rengi"><ColorInput value={p.textColor ?? "#4b5563"} onChange={(v) => upd({ textColor: v })} /></FieldRow>
+        </>
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Block router
 // ---------------------------------------------------------------------------
@@ -789,6 +1054,53 @@ function findBlockLocal(blocks: BlockInstance[], id: string): BlockInstance | nu
     return null;
 }
 
+// ---------------------------------------------------------------------------
+// Görünürlük (Faz 5.2) — hangi cihazlarda blok gösterilsin
+// ---------------------------------------------------------------------------
+function VisibilityFields({ block }: { block: BlockInstance }) {
+    const { updateBlockVisibility } = useBuilderStore();
+    const v = block.visibility;
+    const showOnDesktop = !v?.hideOnDesktop;
+    const showOnTablet = !v?.hideOnTablet;
+    const showOnMobile = !v?.hideOnMobile;
+
+    const set = (patch: Partial<BlockVisibility>) => {
+        const next: BlockVisibility = {
+            hideOnDesktop: patch.hideOnDesktop ?? v?.hideOnDesktop,
+            hideOnTablet: patch.hideOnTablet ?? v?.hideOnTablet,
+            hideOnMobile: patch.hideOnMobile ?? v?.hideOnMobile,
+        };
+        updateBlockVisibility(block.id, next);
+    };
+
+    return (
+        <>
+            <SectionDivider label="Görünürlük" />
+            <FieldRow label="Masaüstünde göster">
+                <ToggleInput
+                    value={showOnDesktop}
+                    onChange={(checked) => set({ hideOnDesktop: !checked })}
+                    label="Masaüstünde göster"
+                />
+            </FieldRow>
+            <FieldRow label="Tablet'te göster">
+                <ToggleInput
+                    value={showOnTablet}
+                    onChange={(checked) => set({ hideOnTablet: !checked })}
+                    label="Tablet'te göster"
+                />
+            </FieldRow>
+            <FieldRow label="Mobilde göster">
+                <ToggleInput
+                    value={showOnMobile}
+                    onChange={(checked) => set({ hideOnMobile: !checked })}
+                    label="Mobilde göster"
+                />
+            </FieldRow>
+        </>
+    );
+}
+
 function BlockEditor({ block }: { block: BlockInstance }) {
     switch (block.type) {
         case "heading": return <HeadingEditor block={block} />;
@@ -804,6 +1116,9 @@ function BlockEditor({ block }: { block: BlockInstance }) {
         case "card": return <CardEditor block={block} />;
         case "html": return <HtmlEditor block={block} />;
         case "video": return <VideoEditor block={block} />;
+        case "tabs": return <TabsEditor block={block} />;
+        case "accordion": return <AccordionEditor block={block} />;
+        case "icon-box": return <IconBoxEditor block={block} />;
         default: return <p>Bu blok için ayarlar yok.</p>;
     }
 }
@@ -812,7 +1127,7 @@ function BlockEditor({ block }: { block: BlockInstance }) {
 // Properties Panel — main export
 // ---------------------------------------------------------------------------
 
-export function PropertiesPanel() {
+export function PropertiesPanel({ pageId }: { pageId: string }) {
     const { blocks, selectedId, deleteBlock, duplicateBlock } = useBuilderStore();
 
     if (!selectedId) {
@@ -824,7 +1139,7 @@ export function PropertiesPanel() {
                         <span>Sayfa Ayarları</span>
                     </div>
                 </div>
-                <PageSettingsEditor />
+                <PageSettingsEditor pageId={pageId} />
             </aside>
         );
     }
@@ -854,6 +1169,7 @@ export function PropertiesPanel() {
                 </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2.5 builder-scrollbar">
+                <VisibilityFields block={block} />
                 <BlockEditor block={block} />
             </div>
         </aside>

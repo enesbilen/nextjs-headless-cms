@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { BLOCK_DEFINITIONS, BLOCK_CATEGORIES } from "@/core/page-builder/blocks/definitions";
+import { SECTION_TEMPLATES, type SectionTemplateMeta } from "@/core/page-builder/templates/sectionTemplates";
 import type { BlockType } from "@/core/page-builder/types";
 import { useBuilderStore } from "@/core/page-builder/store";
 
@@ -41,6 +42,32 @@ function DraggableElCard({ type, label, icon, description }: {
 }
 
 // ---------------------------------------------------------------------------
+// Template card (şablon ekle)
+// ---------------------------------------------------------------------------
+
+function TemplateCard({ template }: { template: SectionTemplateMeta }) {
+    const { insertBlocksAtRoot } = useBuilderStore();
+    return (
+        <button
+            type="button"
+            onClick={() => insertBlocksAtRoot(template.blocks)}
+            className="flex items-center gap-2 w-full py-2 px-2.5 rounded-lg border border-builder-line bg-slate-900/80 text-left cursor-pointer transition-all hover:border-blue-500 hover:bg-builder-line text-slate-200"
+            title={template.description}
+        >
+            <span className="text-base shrink-0">{template.icon}</span>
+            <div className="min-w-0 flex-1">
+                <span className="text-[0.72rem] font-semibold text-slate-200 block truncate">
+                    {template.label}
+                </span>
+                <span className="text-[0.65rem] text-slate-500 block truncate">
+                    {template.description}
+                </span>
+            </div>
+        </button>
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Elements Panel
 // ---------------------------------------------------------------------------
 
@@ -72,6 +99,18 @@ export function ElementsPanel() {
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full py-1.5 px-2.5 rounded-md border border-builder-line bg-slate-900 text-slate-200 text-[0.8rem] outline-none focus:border-blue-500 placeholder:text-slate-600"
                 />
+            </div>
+
+            {/* Şablonlar */}
+            <div className="px-3 pb-2 border-b border-builder-edge">
+                <span className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
+                    Şablonlar
+                </span>
+                <div className="flex flex-col gap-1">
+                    {SECTION_TEMPLATES.map((tpl) => (
+                        <TemplateCard key={tpl.id} template={tpl} />
+                    ))}
+                </div>
             </div>
 
             {/* Category tabs */}

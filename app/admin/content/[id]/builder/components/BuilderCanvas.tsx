@@ -275,7 +275,7 @@ export function BuilderCanvas() {
             onDragEnd={handleDragEnd}
         >
             <div
-                className="flex-1 overflow-y-auto bg-gray-900 flex justify-center py-6 min-w-0"
+                className="flex-1 overflow-auto builder-canvas-scroll"
                 onClick={() => selectBlock(null)}
             >
                 <div

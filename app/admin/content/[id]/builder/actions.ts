@@ -6,6 +6,7 @@ import { normalizePath } from "@/core/resolve";
 import type { PageBuilderDoc } from "@/core/page-builder/types";
 import { revalidatePath } from "next/cache";
 import { getMediaUrl } from "@/core/media/url";
+import { REVISIONS_MAX_SIZE } from "@/core/page-builder/constants";
 
 export async function saveBuilderBlocks(
     pageId: string,
@@ -28,6 +29,27 @@ export async function saveBuilderBlocks(
         },
     });
 
+    // Create revision (snapshot of this save)
+    const label = status === "DRAFT" ? "Taslak kaydet" : "Yayınla";
+    await db.pageRevision.create({
+        data: {
+            pageId,
+            doc: doc as unknown as object,
+            label,
+        },
+    });
+
+    // Keep only last N revisions for this page
+    const revisions = await db.pageRevision.findMany({
+        where: { pageId },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+    });
+    if (revisions.length > REVISIONS_MAX_SIZE) {
+        const toDelete = revisions.slice(REVISIONS_MAX_SIZE).map((r) => r.id);
+        await db.pageRevision.deleteMany({ where: { id: { in: toDelete } } });
+    }
+
     // Invalidate cache if published or was previously published
     if (status === "PUBLISHED" || prev.status === "PUBLISHED") {
         invalidate(normalizePath("/" + prev.slug));
@@ -35,6 +57,38 @@ export async function saveBuilderBlocks(
 
     revalidatePath("/admin");
     revalidatePath(`/admin/content/${pageId}`);
+}
+
+// ---------------------------------------------------------------------------
+// Revisions
+// ---------------------------------------------------------------------------
+
+export type PageRevisionItem = {
+    id: string;
+    label: string | null;
+    createdAt: Date;
+};
+
+export async function getPageRevisions(pageId: string): Promise<PageRevisionItem[]> {
+    const rows = await db.pageRevision.findMany({
+        where: { pageId },
+        orderBy: { createdAt: "desc" },
+        take: REVISIONS_MAX_SIZE,
+        select: { id: true, label: true, createdAt: true },
+    });
+    return rows;
+}
+
+export async function loadRevision(
+    pageId: string,
+    revisionId: string
+): Promise<PageBuilderDoc | null> {
+    const rev = await db.pageRevision.findFirst({
+        where: { id: revisionId, pageId },
+        select: { doc: true },
+    });
+    if (!rev || !rev.doc) return null;
+    return rev.doc as unknown as PageBuilderDoc;
 }
 
 // ---------------------------------------------------------------------------

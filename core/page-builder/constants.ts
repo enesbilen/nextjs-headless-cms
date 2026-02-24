@@ -15,6 +15,9 @@ export const BREAKPOINTS = {
 /** Max number of undo steps kept in history. */
 export const HISTORY_MAX_SIZE = 50;
 
+/** Max number of page revisions kept per page (oldest deleted when exceeding). */
+export const REVISIONS_MAX_SIZE = 20;
+
 /** Default device when opening the builder. */
 export const DEFAULT_DEVICE: BuilderDevice = "desktop";
 

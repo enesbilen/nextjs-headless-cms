@@ -27,7 +27,10 @@ export type BlockType =
     | "hero"
     | "card"
     | "html"
-    | "video";
+    | "video"
+    | "tabs"
+    | "accordion"
+    | "icon-box";
 
 // ---------------------------------------------------------------------------
 // Per-block prop shapes
@@ -52,6 +55,8 @@ export interface TextProps {
     align: AlignValue;
     color: string;
     fontSize?: string;
+    /** Optional per-breakpoint overrides (tablet, mobile). */
+    responsive?: ResponsiveOverrides<{ fontSize?: string; align?: AlignValue; color?: string }>;
 }
 
 export interface ImageProps {
@@ -76,6 +81,8 @@ export interface ButtonProps {
     backgroundColor?: string;
     textColor?: string;
     borderRadius?: string;
+    /** Optional per-breakpoint overrides (tablet, mobile). */
+    responsive?: ResponsiveOverrides<{ align?: AlignValue; fontSize?: string }>;
 }
 
 export interface DividerProps {
@@ -84,10 +91,14 @@ export interface DividerProps {
     style: "solid" | "dashed" | "dotted";
     marginTop: number;
     marginBottom: number;
+    /** Optional per-breakpoint overrides (tablet, mobile). */
+    responsive?: ResponsiveOverrides<{ marginTop?: number; marginBottom?: number }>;
 }
 
 export interface SpacerProps {
     height: number;
+    /** Optional per-breakpoint overrides (tablet, mobile). */
+    responsive?: ResponsiveOverrides<{ height?: number }>;
 }
 
 export interface SectionProps {
@@ -102,6 +113,8 @@ export interface SectionProps {
     /** Max-width of the inner content container (for full-bleed bg + constrained content) */
     innerMaxWidth?: string;
     gap: number;
+    /** Optional per-breakpoint overrides (tablet, mobile). */
+    responsive?: ResponsiveOverrides<{ paddingTop?: number; paddingBottom?: number; paddingLeft?: number; paddingRight?: number; gap?: number }>;
 }
 
 /** Per-column individual style overrides */
@@ -140,6 +153,8 @@ export interface HeroProps {
     align: AlignValue;
     height?: string;
     overlayOpacity?: number;
+    /** Optional per-breakpoint overrides (tablet, mobile). */
+    responsive?: ResponsiveOverrides<{ align?: AlignValue; padding?: string }>;
 }
 
 export interface CardProps {
@@ -167,6 +182,40 @@ export interface VideoProps {
     aspectRatio: "16/9" | "4/3" | "1/1";
 }
 
+/** Tek sekme: etiket + içerik (HTML/metin) */
+export interface TabItem {
+    label: string;
+    content: string;
+}
+
+export interface TabsProps {
+    tabs: TabItem[];
+    /** Varsayılan açık sekme indeksi (0 tabanlı) */
+    defaultTabIndex?: number;
+}
+
+/** Accordion tek öğe */
+export interface AccordionItem {
+    title: string;
+    content: string;
+    /** İlk render'da açık mı */
+    open?: boolean;
+}
+
+export interface AccordionProps {
+    items: AccordionItem[];
+}
+
+export interface IconBoxProps {
+    icon: string;
+    title: string;
+    text: string;
+    align: AlignValue;
+    iconColor?: string;
+    titleColor?: string;
+    textColor?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Union type for all block props
 // ---------------------------------------------------------------------------
@@ -183,16 +232,28 @@ export type BlockProps =
     | HeroProps
     | CardProps
     | HtmlProps
-    | VideoProps;
+    | VideoProps
+    | TabsProps
+    | AccordionProps
+    | IconBoxProps;
 
 // ---------------------------------------------------------------------------
 // Block Instance (the node in the tree)
 // ---------------------------------------------------------------------------
 
+/** Hangi cihazlarda blok gizlensin (breakpoint bazlı). */
+export interface BlockVisibility {
+    hideOnDesktop?: boolean;
+    hideOnTablet?: boolean;
+    hideOnMobile?: boolean;
+}
+
 export interface BlockInstance {
     id: string;
     type: BlockType;
     props: BlockProps;
+    /** Hangi breakpoint'lerde gizlenecek (frontend'de uygulanır). */
+    visibility?: BlockVisibility;
     /** Child blocks for layout containers (section, columns-2, columns-3) */
     children?: BlockInstance[][];
 }
