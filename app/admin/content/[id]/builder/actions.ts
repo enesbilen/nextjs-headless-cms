@@ -98,7 +98,7 @@ export async function loadRevision(
 export async function fetchMenuList(): Promise<{ id: string; name: string }[]> {
     const { getMenus } = await import("@/core/menu/menu-service");
     const menus = await getMenus();
-    return menus.map((m) => ({ id: m.id, name: m.name }));
+    return menus.map((m: { id: string; name: string }) => ({ id: m.id, name: m.name }));
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ export async function getMediaList(opts: {
         db.media.count({ where }),
     ]);
 
-    const items: MediaPickerItem[] = rows.map((m) => {
+    const items: MediaPickerItem[] = rows.map((m: { id: string; filename: string; storagePath: string; mimeType: string | null; width: number | null; height: number | null; version: number | null }) => {
         const url = getMediaUrl(m.id, m, m.version ?? undefined);
         const sep = url.includes("?") ? "&" : "?";
         return {
