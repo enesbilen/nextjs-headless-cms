@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/core/db";
 import type { MenuItemData, MenuWithItems } from "./types";
 
-export async function getMenus() {
+export async function getMenus(): Promise<{ id: string; name: string; slug: string }[]> {
   return db.menu.findMany({
     orderBy: { name: "asc" },
     select: { id: true, name: true, slug: true },
