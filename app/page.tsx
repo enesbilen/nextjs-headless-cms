@@ -1,6 +1,8 @@
 import { db } from "@/core/db";
 import { getManySettings, CMS_SETTING_KEYS } from "@/core/settings-service";
 import { PageContent } from "@/core/PageContent";
+import { resolvedPageSelect } from "@/core/resolve";
+import { renderZone } from "@/core/layout/render-layout";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
@@ -23,45 +25,37 @@ export default async function HomePage() {
 
   if (!homepageId) {
     return (
-      <main
-        style={{
-          maxWidth: "800px",
-          margin: "40px auto",
-          fontFamily: "sans-serif",
-        }}
-      >
+      <main className="max-w-[800px] mx-auto my-10 font-sans">
         <p>Homepage is not configured in admin settings.</p>
       </main>
     );
   }
 
-  const page = await db.page.findUnique({
-    where: { id: homepageId },
-    select: {
-      id: true,
-      title: true,
-      body: true,
-      blocks: true,
-      builderMode: true,
-      status: true,
-      coverImageId: true,
-      coverImage: {
-        select: { id: true, filename: true, storagePath: true, alt: true, width: true, height: true, mimeType: true },
-      },
-    },
+  const page = await db.page.findFirst({
+    where: { id: homepageId, status: "PUBLISHED" },
+    select: resolvedPageSelect,
   });
 
-  if (!page || page.status !== "PUBLISHED") {
+  if (!page) {
     notFound();
   }
 
+  const [header, footer] = await Promise.all([
+    renderZone("header"),
+    renderZone("footer"),
+  ]);
+
   return (
-    <PageContent
-      title={page.title}
-      body={page.body}
-      coverImage={page.coverImage}
-      builderMode={page.builderMode}
-      blocks={page.blocks}
-    />
+    <>
+      {header}
+      <PageContent
+        title={page.title}
+        body={page.body}
+        coverImage={page.coverImage}
+        builderMode={page.builderMode}
+        blocks={page.blocks}
+      />
+      {footer}
+    </>
   );
 }

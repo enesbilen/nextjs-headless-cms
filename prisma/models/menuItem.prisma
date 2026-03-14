@@ -1,0 +1,16 @@
+model MenuItem {
+  id           String   @id @default(cuid())
+  menuId       String
+  label        String
+  href         String
+  openInNewTab Boolean  @default(false)
+  order        Int      @default(0)
+  parentId     String?
+
+  menu   Menu    @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  parent MenuItem?  @relation("MenuItemParent", fields: [parentId], references: [id], onDelete: Cascade)
+  children MenuItem[] @relation("MenuItemParent")
+
+  @@index([menuId])
+  @@index([parentId])
+}

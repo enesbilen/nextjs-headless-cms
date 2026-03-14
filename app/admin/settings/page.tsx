@@ -14,8 +14,11 @@ type PageProps = {
 
 const ERROR_MESSAGES: Record<string, string> = {
   same_page: "Anasayfa ve 404 sayfası aynı olamaz.",
+  same_header_footer: "Header ve Footer aynı sayfa olamaz.",
   invalid_homepage: "Seçilen anasayfa bulunamadı veya yayında değil.",
   invalid_notfound: "Seçilen 404 sayfası bulunamadı veya yayında değil.",
+  invalid_header: "Seçilen header sayfası bulunamadı veya yayında değil.",
+  invalid_footer: "Seçilen footer sayfası bulunamadı veya yayında değil.",
 };
 
 export default async function AdminSettingsPage({ searchParams }: PageProps) {
@@ -26,6 +29,8 @@ export default async function AdminSettingsPage({ searchParams }: PageProps) {
     CMS_SETTING_KEYS.SITE_LOGO_URL,
     CMS_SETTING_KEYS.HOMEPAGE_ID,
     CMS_SETTING_KEYS.NOTFOUND_PAGE_ID,
+    CMS_SETTING_KEYS.HEADER_PAGE_ID,
+    CMS_SETTING_KEYS.FOOTER_PAGE_ID,
   ]);
 
   const pages = await db.page.findMany({
@@ -103,6 +108,38 @@ export default async function AdminSettingsPage({ searchParams }: PageProps) {
           <select
             name="notfound_page_id"
             defaultValue={settings[CMS_SETTING_KEYS.NOTFOUND_PAGE_ID] ?? ""}
+            className="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+          >
+            <option value="">-- None --</option>
+            {pages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-medium">Header sayfası</span>
+          <select
+            name="header_page_id"
+            defaultValue={settings[CMS_SETTING_KEYS.HEADER_PAGE_ID] ?? ""}
+            className="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+          >
+            <option value="">-- None --</option>
+            {pages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-medium">Footer sayfası</span>
+          <select
+            name="footer_page_id"
+            defaultValue={settings[CMS_SETTING_KEYS.FOOTER_PAGE_ID] ?? ""}
             className="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
           >
             <option value="">-- None --</option>

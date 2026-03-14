@@ -7,6 +7,12 @@ export const CMS_SETTING_KEYS = {
   SITE_LOGO_URL: "site_logo_url",
   HOMEPAGE_ID: "homepage_id",
   NOTFOUND_PAGE_ID: "notfound_page_id",
+  HEADER_PAGE_ID: "header_page_id",
+  FOOTER_PAGE_ID: "footer_page_id",
+  HEADER_MODE: "header_mode",
+  HEADER_TEMPLATE_ID: "header_template_id",
+  FOOTER_MODE: "footer_mode",
+  FOOTER_TEMPLATE_ID: "footer_template_id",
 } as const;
 
 const cache = new Map<string, string | null>();

@@ -8,6 +8,7 @@ import type {
     BlockType,
     BlockProps,
     BlockVisibility,
+    AdvancedStyle,
     BuilderDevice,
     PageBuilderDoc,
     PageSettings,
@@ -83,6 +84,8 @@ export interface BuilderActions {
     insertBlocksAtRoot: (blocks: BlockInstance[]) => void;
     /** Set block visibility (hide on desktop/tablet/mobile). */
     updateBlockVisibility: (blockId: string, visibility: BlockVisibility | undefined) => void;
+    /** Update block advanced style (margin, border, shadow, opacity etc.). */
+    updateBlockAdvancedStyle: (blockId: string, style: AdvancedStyle | undefined) => void;
     /** Columns blokunda sütun sayısını 2 veya 3 yap (tip, props, children güncellenir). */
     setColumnsCount: (blockId: string, count: 2 | 3) => void;
 }
@@ -300,6 +303,17 @@ export const useBuilderStore = create<BuilderStore>()(
                     block.visibility = visibility && (visibility.hideOnDesktop || visibility.hideOnTablet || visibility.hideOnMobile)
                         ? visibility
                         : undefined;
+                }
+                s.isDirty = true;
+            });
+        },
+
+        updateBlockAdvancedStyle(blockId, style) {
+            set((s) => {
+                pushHistory(s);
+                const block = findBlock(s.blocks, blockId);
+                if (block) {
+                    block.advancedStyle = style;
                 }
                 s.isDirty = true;
             });

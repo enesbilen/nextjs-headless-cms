@@ -30,7 +30,19 @@ export type BlockType =
     | "video"
     | "tabs"
     | "accordion"
-    | "icon-box";
+    | "icon-box"
+    | "list"
+    | "quote"
+    | "social-links"
+    | "alert"
+    | "testimonial"
+    | "counter"
+    | "gallery"
+    | "map"
+    | "form"
+    | "progress-bar"
+    | "navigation-menu"
+    | "breadcrumb";
 
 // ---------------------------------------------------------------------------
 // Per-block prop shapes
@@ -126,6 +138,10 @@ export interface ColumnSettings {
     paddingRight?: number;
     verticalAlign?: "start" | "center" | "end";
     borderRadius?: string;
+    /** CSS width (e.g. "200px", "1fr", "30%") */
+    width?: string;
+    /** CSS min-height (e.g. "100px", "10rem") */
+    minHeight?: string;
 }
 
 export interface ColumnsProps {
@@ -138,6 +154,10 @@ export interface ColumnsProps {
     paddingBottom: number;
     paddingLeft?: number;
     paddingRight?: number;
+    /** Container width (e.g. "100%", "1200px") */
+    width?: string;
+    /** Container height (e.g. "auto", "400px") */
+    height?: string;
     /** Per-column individual overrides */
     columnSettings?: ColumnSettings[];
 }
@@ -180,6 +200,10 @@ export interface VideoProps {
     loop: boolean;
     controls: boolean;
     aspectRatio: "16/9" | "4/3" | "1/1";
+    /** CSS width (e.g. "100%", "800px") */
+    width?: string;
+    /** CSS height (e.g. "auto", "450px") */
+    height?: string;
 }
 
 /** Tek sekme: etiket + içerik (HTML/metin) */
@@ -216,6 +240,112 @@ export interface IconBoxProps {
     textColor?: string;
 }
 
+export interface ListProps {
+    items: string[];
+    ordered: boolean;
+    color: string;
+    fontSize?: string;
+}
+
+export interface QuoteProps {
+    text: string;
+    author?: string;
+    borderColor: string;
+    textColor: string;
+    fontSize?: string;
+}
+
+export interface SocialLink {
+    platform: "facebook" | "twitter" | "instagram" | "linkedin" | "youtube" | "github" | "tiktok" | "website";
+    url: string;
+}
+
+export interface SocialLinksProps {
+    links: SocialLink[];
+    size: "sm" | "md" | "lg";
+    align: AlignValue;
+    color?: string;
+}
+
+export interface AlertProps {
+    text: string;
+    variant: "info" | "success" | "warning" | "error";
+    title?: string;
+}
+
+export interface TestimonialProps {
+    quote: string;
+    name: string;
+    title?: string;
+    avatarSrc?: string;
+    rating?: number;
+}
+
+export interface CounterProps {
+    value: string;
+    label: string;
+    prefix?: string;
+    suffix?: string;
+    color?: string;
+}
+
+export interface GalleryImage {
+    src?: string;
+    alt: string;
+    mediaId?: string;
+}
+
+export interface GalleryProps {
+    images: GalleryImage[];
+    columns: 2 | 3 | 4;
+    gap: number;
+    borderRadius: string;
+}
+
+export interface MapProps {
+    embedUrl: string;
+    height: string;
+    borderRadius: string;
+}
+
+export interface FormField {
+    label: string;
+    type: "text" | "email" | "textarea";
+    required: boolean;
+}
+
+export interface FormProps {
+    fields: FormField[];
+    submitLabel: string;
+    backgroundColor?: string;
+    buttonColor?: string;
+}
+
+export interface ProgressBarProps {
+    label: string;
+    value: number;
+    maxValue: number;
+    color: string;
+    showLabel: boolean;
+}
+
+export interface NavigationMenuProps {
+    menuId: string;
+    layout: "horizontal" | "vertical";
+    align: AlignValue;
+    textColor: string;
+    hoverColor: string;
+    fontSize: string;
+    gap: number;
+}
+
+export interface BreadcrumbProps {
+    separator: string;
+    textColor: string;
+    linkColor: string;
+    fontSize: string;
+}
+
 // ---------------------------------------------------------------------------
 // Union type for all block props
 // ---------------------------------------------------------------------------
@@ -235,7 +365,19 @@ export type BlockProps =
     | VideoProps
     | TabsProps
     | AccordionProps
-    | IconBoxProps;
+    | IconBoxProps
+    | ListProps
+    | QuoteProps
+    | SocialLinksProps
+    | AlertProps
+    | TestimonialProps
+    | CounterProps
+    | GalleryProps
+    | MapProps
+    | FormProps
+    | ProgressBarProps
+    | NavigationMenuProps
+    | BreadcrumbProps;
 
 // ---------------------------------------------------------------------------
 // Block Instance (the node in the tree)
@@ -248,12 +390,30 @@ export interface BlockVisibility {
     hideOnMobile?: boolean;
 }
 
+/** Gelişmiş stil: her blok için opsiyonel margin, border, shadow, opacity vb. */
+export interface AdvancedStyle {
+    marginTop?: string;
+    marginRight?: string;
+    marginBottom?: string;
+    marginLeft?: string;
+    borderWidth?: string;
+    borderStyle?: "none" | "solid" | "dashed" | "dotted" | "double";
+    borderColor?: string;
+    borderRadius?: string;
+    boxShadow?: string;
+    opacity?: number;
+    overflow?: "visible" | "hidden" | "auto" | "scroll";
+    customClassName?: string;
+}
+
 export interface BlockInstance {
     id: string;
     type: BlockType;
     props: BlockProps;
     /** Hangi breakpoint'lerde gizlenecek (frontend'de uygulanır). */
     visibility?: BlockVisibility;
+    /** Gelişmiş stil (margin, border, shadow, opacity vb.) */
+    advancedStyle?: AdvancedStyle;
     /** Child blocks for layout containers (section, columns-2, columns-3) */
     children?: BlockInstance[][];
 }
@@ -272,6 +432,8 @@ export interface PageSettings {
     layoutPreset: PageLayoutPreset;
     /** Outer content max-width (e.g. "1200px", "100%") */
     contentWidth: string;
+    /** Horizontal alignment of the constrained content wrapper */
+    contentAlign?: AlignValue;
     backgroundColor: string;
     backgroundImage?: string;
     fontFamily?: string;
@@ -284,6 +446,7 @@ export interface PageSettings {
 export const DEFAULT_PAGE_SETTINGS: PageSettings = {
     layoutPreset: "boxed",
     contentWidth: "1200px",
+    contentAlign: "center",
     backgroundColor: "#ffffff",
     fontFamily: "inherit",
     textColor: "#111827",
