@@ -46,7 +46,7 @@ export async function saveBuilderBlocks(
         select: { id: true },
     });
     if (revisions.length > REVISIONS_MAX_SIZE) {
-        const toDelete = revisions.slice(REVISIONS_MAX_SIZE).map((r) => r.id);
+        const toDelete = revisions.slice(REVISIONS_MAX_SIZE).map((r: { id: string }) => r.id);
         await db.pageRevision.deleteMany({ where: { id: { in: toDelete } } });
     }
 
@@ -89,6 +89,16 @@ export async function loadRevision(
     });
     if (!rev || !rev.doc) return null;
     return rev.doc as unknown as PageBuilderDoc;
+}
+
+// ---------------------------------------------------------------------------
+// Menu list for NavigationMenuEditor
+// ---------------------------------------------------------------------------
+
+export async function fetchMenuList(): Promise<{ id: string; name: string }[]> {
+    const { getMenus } = await import("@/core/menu/menu-service");
+    const menus = await getMenus();
+    return menus.map((m) => ({ id: m.id, name: m.name }));
 }
 
 // ---------------------------------------------------------------------------
