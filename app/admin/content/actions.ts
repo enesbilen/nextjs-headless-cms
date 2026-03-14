@@ -2,6 +2,7 @@
 
 import { invalidate } from "@/core/cache";
 import { db } from "@/core/db";
+import type { Prisma } from "@prisma/client";
 import { syncPageMediaUsageInTx } from "@/core/media/media-usage";
 import { normalizePath } from "@/core/resolve";
 import {
@@ -40,7 +41,7 @@ export async function createContent(formData: FormData) {
     return { error: "Bu slug zaten kullanılıyor" };
   }
 
-  const content = await db.$transaction(async (tx) => {
+  const content = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const created = await tx.page.create({
       data: { title, slug, body, status },
     });
@@ -88,7 +89,7 @@ export async function updateContent(
     return { error: "Bu slug zaten başka bir içerikte kullanılıyor" };
   }
 
-  const content = await db.$transaction(async (tx) => {
+  const content = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const updated = await tx.page.update({
       where: { id },
       data: { title, slug, body, status },
